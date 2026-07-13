@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String       @id
+  name              String
+  role              String
+  title             String
+  avatarColor       String       @default("#2563eb")
+  supplierId        String?
+  supplier          Supplier?    @relation(fields: [supplierId], references: [id])
+  ownedMaterials    Material[]   @relation("MaterialOwner")
+  createdRisks      Risk[]       @relation("RiskCreator")
+  recommendedActions Action[]    @relation("ActionRecommender")
+  ownedActions      Action[]     @relation("ActionOwner")
+  ownedTasks        FollowTask[] @relation("TaskOwner")
+  taskUpdates       TaskUpdate[]
+  attachments       Attachment[]
+  ownedPlans        ExpansionPlan[] @relation("PlanOwner")
+  notifications     Notification[]
+  createdAt         DateTime     @default(now())
+}
+
+model Supplier {
+  id               String          @id
+  code             String          @unique
+  name             String
+  shortName        String
+  category         String
+  contact          String
+  location         String
+  cooperationYears Int             @default(0)
+  users            User[]
+  materials        Material[]
+  expansionPlans   ExpansionPlan[]
+  createdAt        DateTime        @default(now())
+}
+
+model Material {
+  id                 String           @id
+  name               String
+  type               String
+  supplierId         String
+  supplier           Supplier         @relation(fields: [supplierId], references: [id])
+  demandMonthly      Float
+  supplyMonthly      Float
+  inventory          Float
+  safetyStockMonths  Float
+  singleSource       Boolean          @default(false)
+  dependenceLevel    String?
+  riskLevel          String           @default("GREEN")
+  riskDescription    String
+  ownerId            String
+  owner              User             @relation("MaterialOwner", fields: [ownerId], references: [id])
+  risks              Risk[]
+  healthSnapshots    HealthSnapshot[]
+  expansionPlans     ExpansionPlan[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+model HealthSnapshot {
+  id         Int      @id @default(autoincrement())
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  weekLabel  String
+  weekDate   DateTime
+  score      Int
+
+  @@unique([materialId, weekDate])
+}
+
+model Risk {
+  id           String    @id
+  materialId   String
+  material     Material  @relation(fields: [materialId], references: [id])
+  type         String
+  level        String
+  description  String
+  impactScope  String
+  discoveredAt DateTime  @default(now())
+  creatorId    String
+  creator      User      @relation("RiskCreator", fields: [creatorId], references: [id])
+  status       String    @default("PENDING")
+  isAuto       Boolean   @default(false)
+  actions      Action[]
+  closedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Action {
+  id            String     @id
+  riskId        String
+  risk          Risk       @relation(fields: [riskId], references: [id])
+  type          String
+  description   String
+  recommenderId String
+  recommender   User       @relation("ActionRecommender", fields: [recommenderId], references: [id])
+  ownerId       String
+  owner         User       @relation("ActionOwner", fields: [ownerId], references: [id])
+  deadline      DateTime
+  priority      String
+  status        String     @default("NOT_STARTED")
+  completion    Int        @default(0)
+  task          FollowTask?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model FollowTask {
+  id                  String       @id
+  actionId            String       @unique
+  action              Action       @relation(fields: [actionId], references: [id])
+  title               String
+  ownerId             String
+  owner               User         @relation("TaskOwner", fields: [ownerId], references: [id])
+  collaboratorNames   String       @default("")
+  startDate           DateTime
+  deadline            DateTime
+  progress             Int          @default(0)
+  status               String       @default("NOT_STARTED")
+  progressDescription String        @default("")
+  updates              TaskUpdate[]
+  attachments          Attachment[]
+  closedAt             DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+}
+
+model TaskUpdate {
+  id          Int        @id @default(autoincrement())
+  taskId      String
+  task        FollowTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  progress    Int
+  description String
+  authorId    String
+  author      User       @relation(fields: [authorId], references: [id])
+  createdAt   DateTime   @default(now())
+}
+
+model Attachment {
+  id           Int        @id @default(autoincrement())
+  taskId       String
+  task         FollowTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileName     String
+  storedName   String
+  mimeType     String
+  size         Int
+  url          String
+  uploadedById String
+  uploadedBy   User       @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime   @default(now())
+}
+
+model ExpansionPlan {
+  id               String          @id
+  materialId       String
+  material         Material        @relation(fields: [materialId], references: [id])
+  supplierId       String
+  supplier         Supplier        @relation(fields: [supplierId], references: [id])
+  name             String
+  startDate        DateTime
+  endDate          DateTime
+  targetCapacity   Float
+  investedCapex    Float
+  totalCapex       Float
+  fundingSources   String
+  stage            String
+  progress         Int
+  expectedProgress Int
+  status           String
+  riskTypes        String
+  riskDescription  String
+  ownerId          String
+  owner             User           @relation("PlanOwner", fields: [ownerId], references: [id])
+  items             ExpansionItem[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model ExpansionItem {
+  id              Int           @id @default(autoincrement())
+  planId          String
+  plan            ExpansionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  type            String
+  name            String
+  vendor          String
+  orderNo         String
+  expectedArrival DateTime
+  actualArrival   DateTime?
+  status          String
+  delayDays       Int           @default(0)
+  note            String        @default("")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  level     String
+  title     String
+  message   String
+  link      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
