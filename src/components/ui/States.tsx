@@ -1,19 +1,28 @@
-import { AlertCircle, LoaderCircle } from 'lucide-react'
+import type { ReactNode } from 'react'
 
-export function LoadingState({ label = '正在加载数据' }: { label?: string }) {
-  return <div className="state-panel"><LoaderCircle className="spin" size={24} /><span>{label}</span></div>
+interface LoadingStateProps { label?: string }
+export function LoadingState({ label = '加载中…' }: LoadingStateProps) {
+  return <div className="state-box loading"><span className="spinner" />{label}</div>
 }
 
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+interface ErrorStateProps { message: string; onRetry?: () => void }
+export function ErrorState({ message, onRetry }: ErrorStateProps) {
   return (
-    <div className="state-panel state-error">
-      <AlertCircle size={24} />
-      <span>{message}</span>
-      {onRetry && <button className="button button-secondary button-small" onClick={onRetry}>重新加载</button>}
+    <div className="state-box error">
+      <strong>出现错误</strong>
+      <p>{message}</p>
+      {onRetry && <button onClick={onRetry} className="button button-secondary">重试</button>}
     </div>
   )
 }
 
-export function EmptyState({ title, description }: { title: string; description: string }) {
-  return <div className="empty-state"><strong>{title}</strong><span>{description}</span></div>
+interface EmptyStateProps { title: string; description?: string; action?: ReactNode }
+export function EmptyState({ title, description, action }: EmptyStateProps) {
+  return (
+    <div className="state-box empty">
+      <strong>{title}</strong>
+      {description && <p>{description}</p>}
+      {action}
+    </div>
+  )
 }

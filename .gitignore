@@ -2,6 +2,9 @@ node_modules/
 dist/
 *.tsbuildinfo
 .env
+backend/.venv/
+backend/data/app.db
+backend/data/uploads/
 prisma/dev.db
 prisma/dev.db-journal
 uploads/*

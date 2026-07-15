@@ -1,17 +1,24 @@
-export function ProgressBar({ value, expected, status, compact = false }: {
-  value: number
+interface ProgressBarProps {
+  progress: number
   expected?: number
-  status?: string
-  compact?: boolean
-}) {
-  const color = status?.toLowerCase() ?? (value === 100 ? 'green' : 'blue')
+  height?: number
+}
+
+export function ProgressBar({ progress, expected, height = 10 }: ProgressBarProps) {
+  const clamped = Math.max(0, Math.min(100, progress))
+  const exp = expected !== undefined ? Math.max(0, Math.min(100, expected)) : null
   return (
-    <div className={`progress-wrap ${compact ? 'compact' : ''}`}>
+    <div className="progress-bar" style={{ height }}>
       <div className="progress-track">
-        <div className={`progress-fill progress-${color}`} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
-        {expected !== undefined && <span className="progress-marker" style={{ left: `${Math.min(100, Math.max(0, expected))}%` }} />}
+        <div className="progress-fill" style={{ width: `${clamped}%` }} />
+        {exp !== null && (
+          <>
+            <div className="progress-expected-marker" style={{ left: `${exp}%` }} />
+            <div className="progress-expected-label" style={{ left: `${exp}%` }}>预期 {exp}%</div>
+          </>
+        )}
       </div>
-      {!compact && <div className="progress-labels"><strong>{value}%</strong>{expected !== undefined && <span>预期 {expected}%</span>}</div>}
+      <strong>{clamped}%</strong>
     </div>
   )
 }

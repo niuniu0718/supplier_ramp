@@ -4,16 +4,13 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n API,WEB -c cyan,green \"tsx watch server/index.ts\" \"vite\"",
-    "dev:api": "tsx watch server/index.ts",
+    "dev": "concurrently -k -n API,WEB -c cyan,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "cd backend && source .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
     "dev:web": "vite",
-    "build": "npm run typecheck && vite build",
-    "start": "tsx server/index.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false && tsc -p tsconfig.server.json --noEmit --pretty false",
-    "test": "vitest run",
-    "db:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force"
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
+    "db:seed": "cd backend && source .venv/bin/activate && python seed.py",
+    "db:reset": "rm -f backend/data/app.db && npm run db:seed"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

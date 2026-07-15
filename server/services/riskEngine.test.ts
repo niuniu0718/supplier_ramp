@@ -1,57 +1,193 @@
 import { describe, expect, it } from 'vitest'
-import { calculateExpansionRisk, calculateMaterialRisk } from './riskEngine.js'
+import {
+  calculateExpectedProgress,
+  calculateExpansionRisk,
+  calculateMaterialRisk,
+} from './riskEngine.js'
 
 describe('calculateMaterialRisk', () => {
-  it('将单点依赖且安全库存不足三个月判为危险', () => {
-    expect(calculateMaterialRisk({
-      demandMonthly: 100,
-      supplyMonthly: 100,
-      inventory: 400,
-      safetyStockMonths: 2.9,
-      singleSource: true,
-    })).toBe('RED')
+  it('RED: single-source + safety stock < 3 months', () => {
+    expect(
+      calculateMaterialRisk({
+        demandMonthly: 100,
+        supplyMonthly: 100,
+        inventory: 50,
+        safetyStockMonths: 2,
+        singleSource: true,
+      }),
+    ).toBe('RED')
   })
 
-  it('将库存覆盖不足一个月判为警告', () => {
-    expect(calculateMaterialRisk({
-      demandMonthly: 100,
-      supplyMonthly: 100,
-      inventory: 99,
-      safetyStockMonths: 3,
-      singleSource: false,
-    })).toBe('ORANGE')
+  it('ORANGE: single-source + safety stock < 6 months', () => {
+    expect(
+      calculateMaterialRisk({
+        demandMonthly: 100,
+        supplyMonthly: 100,
+        inventory: 50,
+        safetyStockMonths: 5,
+        singleSource: true,
+      }),
+    ).toBe('ORANGE')
   })
 
-  it('供需和库存正常时返回健康', () => {
-    expect(calculateMaterialRisk({
-      demandMonthly: 100,
-      supplyMonthly: 110,
-      inventory: 300,
-      safetyStockMonths: 3,
-      singleSource: false,
-    })).toBe('GREEN')
+  it('ORANGE: inventory covers < 1 month of demand', () => {
+    expect(
+      calculateMaterialRisk({
+        demandMonthly: 100,
+        supplyMonthly: 100,
+        inventory: 50,
+        safetyStockMonths: 6,
+        singleSource: false,
+      }),
+    ).toBe('ORANGE')
+  })
+
+  it('ORANGE: gap > 30%', () => {
+    expect(
+      calculateMaterialRisk({
+        demandMonthly: 100,
+        supplyMonthly: 50,
+        inventory: 200,
+        safetyStockMonths: 6,
+        singleSource: false,
+      }),
+    ).toBe('ORANGE')
+  })
+
+  it('YELLOW: expansion delayed > 60 days, no other triggers', () => {
+    expect(
+      calculateMaterialRisk({
+        demandMonthly: 100,
+        supplyMonthly: 100,
+        inventory: 200,
+        safetyStockMonths: 6,
+        singleSource: false,
+        expansionDelayedDays: 75,
+      }),
+    ).toBe('YELLOW')
+  })
+
+  it('GREEN: well-covered material', () => {
+    expect(
+      calculateMaterialRisk({
+        demandMonthly: 100,
+        supplyMonthly: 100,
+        inventory: 300,
+        safetyStockMonths: 6,
+        singleSource: false,
+      }),
+    ).toBe('GREEN')
+  })
+
+  it('precedence: single-source RED beats inventory-coverage ORANGE', () => {
+    expect(
+      calculateMaterialRisk({
+        demandMonthly: 100,
+        supplyMonthly: 100,
+        inventory: 50,
+        safetyStockMonths: 1,
+        singleSource: true,
+      }),
+    ).toBe('RED')
+  })
+})
+
+describe('calculateExpectedProgress', () => {
+  const start = new Date('2026-01-01')
+  const end = new Date('2026-12-31')
+
+  it('returns 0 before start', () => {
+    expect(calculateExpectedProgress(start, end, new Date('2025-12-31'))).toBe(0)
+  })
+
+  it('returns 100 at/after end', () => {
+    expect(calculateExpectedProgress(start, end, new Date('2027-01-01'))).toBe(100)
+  })
+
+  it('returns ~50 halfway through', () => {
+    expect(calculateExpectedProgress(start, end, new Date('2026-07-02'))).toBeGreaterThanOrEqual(49)
+    expect(calculateExpectedProgress(start, end, new Date('2026-07-02'))).toBeLessThanOrEqual(51)
   })
 })
 
 describe('calculateExpansionRisk', () => {
-  const now = new Date('2026-07-13T00:00:00.000Z')
-  const startDate = new Date('2026-01-01T00:00:00.000Z')
-  const endDate = new Date('2026-12-31T00:00:00.000Z')
+  const start = new Date('2026-01-01')
+  const end = new Date('2026-06-30')
+  const now = new Date('2026-04-01')
 
-  it('按计划周期计算预期进度与落后状态', () => {
-    const result = calculateExpansionRisk({ startDate, endDate, progress: 30, now, updatedAt: now })
-    expect(result.expectedProgress).toBeGreaterThan(50)
-    expect(result.status).toBe('ORANGE')
+  it('GREEN: progress matches expected', () => {
+    const expected = calculateExpectedProgress(start, end, now)
+    expect(
+      calculateExpansionRisk({ startDate: start, endDate: end, progress: expected, now }).status,
+    ).toBe('GREEN')
   })
 
-  it('超过计划结束时间且未完成时判为危险', () => {
-    const result = calculateExpansionRisk({
-      startDate: new Date('2025-01-01T00:00:00.000Z'),
-      endDate: new Date('2026-06-01T00:00:00.000Z'),
-      progress: 90,
+  it('YELLOW: lag 1-10%', () => {
+    const expected = calculateExpectedProgress(start, end, now)
+    expect(
+      calculateExpansionRisk({
+        startDate: start,
+        endDate: end,
+        progress: expected - 5,
+        now,
+      }).status,
+    ).toBe('YELLOW')
+  })
+
+  it('ORANGE: lag 10-30%', () => {
+    const expected = calculateExpectedProgress(start, end, now)
+    expect(
+      calculateExpansionRisk({
+        startDate: start,
+        endDate: end,
+        progress: expected - 20,
+        now,
+      }).status,
+    ).toBe('ORANGE')
+  })
+
+  it('RED: lag > 30%', () => {
+    const expected = calculateExpectedProgress(start, end, now)
+    expect(
+      calculateExpansionRisk({
+        startDate: start,
+        endDate: end,
+        progress: expected - 40,
+        now,
+      }).status,
+    ).toBe('RED')
+  })
+
+  it('RED: overdue with incomplete progress', () => {
+    expect(
+      calculateExpansionRisk({
+        startDate: start,
+        endDate: end,
+        progress: 80,
+        now: new Date('2026-07-15'),
+      }).status,
+    ).toBe('RED')
+  })
+
+  it('GREEN: overdue with 100% progress', () => {
+    expect(
+      calculateExpansionRisk({
+        startDate: start,
+        endDate: end,
+        progress: 100,
+        now: new Date('2026-07-15'),
+      }).status,
+    ).toBe('GREEN')
+  })
+
+  it('lag is never negative', () => {
+    const expected = calculateExpectedProgress(start, end, now)
+    const { lag } = calculateExpansionRisk({
+      startDate: start,
+      endDate: end,
+      progress: expected + 20,
       now,
-      updatedAt: now,
     })
-    expect(result.status).toBe('RED')
+    expect(lag).toBe(0)
   })
 })

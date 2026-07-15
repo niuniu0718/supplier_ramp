@@ -1,95 +1,92 @@
+import { Bell, Factory, LogOut, UserCircle2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Bell, Check, Menu, Search, X } from 'lucide-react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { api } from '../../lib/api'
-import type { Notification } from '../../types'
-import { StatusBadge } from '../ui/StatusBadge'
+import type { NotificationItem } from '../../types'
 
-export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
-  const { user } = useAuth()
+export function Topbar() {
+  const { username, logout } = useAuth()
+  const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [openNotif, setOpenNotif] = useState(false)
   const navigate = useNavigate()
-  const location = useLocation()
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [noticeOpen, setNoticeOpen] = useState(false)
-  const wrapperRef = useRef<HTMLDivElement>(null)
+  const notifRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!user) return
-    api.get<{ unreadCount: number; items: Notification[] }>('/notifications', user.id).then((data) => {
-      setNotifications(data.items)
-      setUnreadCount(data.unreadCount)
-    }).catch(() => undefined)
-  }, [user, location.pathname])
-
-  useEffect(() => {
-    const close = (event: MouseEvent) => {
-      if (!wrapperRef.current?.contains(event.target as Node)) setNoticeOpen(false)
-    }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
+    let active = true
+    api.get<{ notifications: NotificationItem[] }>('/api/notifications')
+      .then((data) => { if (active) setNotifications(data.notifications) })
+      .catch(() => undefined)
+    return () => { active = false }
   }, [])
 
-  if (!user) return null
-
-  const openNotification = async (item: Notification) => {
-    if (!item.isRead) {
-      await api.patch(`/notifications/${item.id}/read`, {}, user.id)
-      setNotifications((current) => current.map((notice) => notice.id === item.id ? { ...notice, isRead: true } : notice))
-      setUnreadCount((count) => Math.max(0, count - 1))
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setOpenNotif(false)
     }
-    setNoticeOpen(false)
-    navigate(item.link)
+    window.addEventListener('mousedown', onClick)
+    return () => window.removeEventListener('mousedown', onClick)
+  }, [])
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length
+
+  const markAllRead = async () => {
+    await api.post('/api/notifications/read-all', {})
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
   }
 
-  const readAll = async () => {
-    await apiRequestReadAll(user.id)
-    setNotifications((current) => current.map((notice) => ({ ...notice, isRead: true })))
-    setUnreadCount(0)
+  const onLogout = async () => {
+    await logout()
+    navigate('/login', { replace: true })
   }
 
   return (
-    <header className="topbar" ref={wrapperRef}>
-      <button className="icon-button mobile-menu-button" onClick={onOpenMenu} aria-label="打开导航"><Menu size={20} /></button>
-      <div className="global-search">
-        <Search size={18} />
-        <input aria-label="全局搜索" placeholder="搜索物料、风险、任务或扩产计划" />
-        <kbd>⌘ K</kbd>
+    <header className="app-topbar">
+      <div className="topbar-meta">
+        <Factory size={16} color="#94a3b8" />
+        <span>采购 → 风险 → 措施 → 闭环 · 证据可追溯</span>
       </div>
       <div className="topbar-actions">
-        <div className="popover-wrap">
-          <button className="icon-button notification-button" onClick={() => setNoticeOpen(!noticeOpen)} aria-label="通知">
-            <Bell size={19} />
-            {unreadCount > 0 && <span className="notification-count">{unreadCount}</span>}
+        <div className="dropdown" ref={notifRef}>
+          <button className="topbar-icon" onClick={() => setOpenNotif((v) => !v)} aria-label="通知">
+            <Bell size={18} />
+            {unreadCount > 0 && <span className="badge-dot">{unreadCount}</span>}
           </button>
-          {noticeOpen && (
-            <div className="popover notification-popover">
-              <div className="popover-header"><div><strong>预警与通知</strong><span>{unreadCount} 条未读</span></div>{unreadCount > 0 && <button onClick={readAll}><Check size={15} />全部已读</button>}</div>
-              <div className="notification-list">
-                {notifications.length === 0 && <div className="notification-empty">暂无通知</div>}
-                {notifications.map((item) => (
-                  <button key={item.id} className={`notification-item ${item.isRead ? '' : 'unread'}`} onClick={() => openNotification(item)}>
-                    <StatusBadge status={item.level} showDot={false} />
-                    <span><strong>{item.title}</strong><small>{item.message}</small></span>
-                    {!item.isRead && <i />}
-                  </button>
+          {openNotif && (
+            <div className="dropdown-panel notif-panel">
+              <header><strong>站内通知</strong><button onClick={markAllRead}>全部已读</button></header>
+              <ul>
+                {notifications.length === 0 && <li className="muted">暂无通知</li>}
+                {notifications.slice(0, 8).map((n) => (
+                  <li key={n.id} className={n.isRead ? 'read' : 'unread'}>
+                    <span className={`level-tag level-${n.level.toLowerCase()}`}>{n.level}</span>
+                    <div>
+                      <strong>{n.title}</strong>
+                      <small>{n.message}</small>
+                    </div>
+                    <button onClick={() => navigate(n.link)}>查看</button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
         </div>
-        <span className="topbar-divider" />
-        <div className="popover-wrap current-user">
-          <span className="avatar" style={{ background: user.avatarColor }}>{user.name.slice(-1)}</span>
-          <div className="user-menu-copy"><strong>{user.name}</strong><small>{user.title}</small></div>
+
+        <div className="dropdown">
+          <div className="topbar-user">
+            <span className="avatar" style={{ background: '#2563eb' }}>
+              <UserCircle2 size={18} color="#fff" />
+            </span>
+            <div className="user-meta">
+              <strong>{username}</strong>
+              <small>本地登录</small>
+            </div>
+          </div>
+          <button className="topbar-icon" onClick={onLogout} aria-label="退出登录" title="退出登录">
+            <LogOut size={18} />
+          </button>
         </div>
       </div>
     </header>
   )
-}
-
-async function apiRequestReadAll(userId: string) {
-  const response = await fetch('/api/notifications/read-all', { method: 'POST', headers: { 'X-User-Id': userId } })
-  if (!response.ok) throw new Error('标记通知失败')
 }

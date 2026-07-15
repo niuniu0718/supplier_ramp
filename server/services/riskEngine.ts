@@ -13,7 +13,6 @@ export interface ExpansionRiskInput {
   startDate: Date
   endDate: Date
   progress: number
-  updatedAt?: Date
   now?: Date
 }
 
@@ -26,11 +25,9 @@ export function calculateMaterialRisk(input: MaterialRiskInput): RiskLevel {
     : Number.POSITIVE_INFINITY
 
   if (input.singleSource && input.safetyStockMonths < 3) return 'RED'
-  if (
-    (input.singleSource && input.safetyStockMonths < 6) ||
-    inventoryCoverage < 1 ||
-    gapRatio > 0.3
-  ) return 'ORANGE'
+  if (input.singleSource && input.safetyStockMonths < 6) return 'ORANGE'
+  if (inventoryCoverage < 1) return 'ORANGE'
+  if (gapRatio > 0.3) return 'ORANGE'
   if ((input.expansionDelayedDays ?? 0) > 60) return 'YELLOW'
   return 'GREEN'
 }
@@ -39,8 +36,9 @@ export function calculateExpectedProgress(startDate: Date, endDate: Date, now = 
   if (now <= startDate) return 0
   if (now >= endDate) return 100
   const total = endDate.getTime() - startDate.getTime()
+  if (total <= 0) return 100
   const elapsed = now.getTime() - startDate.getTime()
-  return Math.round((elapsed / total) * 100)
+  return Math.min(100, Math.round((elapsed / total) * 100))
 }
 
 export function calculateExpansionRisk(input: ExpansionRiskInput): {
@@ -51,19 +49,12 @@ export function calculateExpansionRisk(input: ExpansionRiskInput): {
   const now = input.now ?? new Date()
   const expectedProgress = calculateExpectedProgress(input.startDate, input.endDate, now)
   const lag = Math.max(0, expectedProgress - input.progress)
-  const staleDays = input.updatedAt
-    ? Math.floor((now.getTime() - input.updatedAt.getTime()) / 86_400_000)
-    : 0
+  const overdue = now > input.endDate && input.progress < 100
 
-  if ((now > input.endDate && input.progress < 100) || lag > 30) {
-    return { expectedProgress, status: 'RED', lag }
-  }
-  if (lag > 10 || staleDays > 7) {
-    return { expectedProgress, status: 'ORANGE', lag }
-  }
-  if (lag > 0) {
-    return { expectedProgress, status: 'YELLOW', lag }
-  }
+  if (overdue) return { expectedProgress, status: 'RED', lag }
+  if (lag > 30) return { expectedProgress, status: 'RED', lag }
+  if (lag > 10) return { expectedProgress, status: 'ORANGE', lag }
+  if (lag > 0) return { expectedProgress, status: 'YELLOW', lag }
   return { expectedProgress, status: 'GREEN', lag }
 }
 

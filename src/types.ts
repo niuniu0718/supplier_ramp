@@ -1,179 +1,278 @@
 export type RiskLevel = 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED'
-export type UserRole = 'PROCUREMENT_ENGINEER' | 'PROCUREMENT_MANAGER' | 'DEPARTMENT_LEADER' | 'SUPPLIER'
 
-export interface User {
+export type Role = 'PROCUREMENT_MANAGER' | 'PROCUREMENT_ENGINEER' | 'DEPARTMENT_LEADER' | 'SUPPLIER'
+
+export interface UserSummary {
   id: string
   name: string
-  role: UserRole
+  role: Role
   title: string
-  avatarColor: string
   supplierId: string | null
-  supplier?: { shortName: string } | null
+  avatarColor: string
 }
 
-export interface Supplier {
-  id: string
-  code: string
-  name: string
-  shortName: string
-  category: string
-  contact: string
-  location: string
+export interface Kpi {
+  label: string
+  value: number | string
+  unit?: string
+  hint?: string
+  tone?: 'blue' | 'green' | 'yellow' | 'orange' | 'red' | 'purple'
 }
 
-export interface Material {
+export interface ExpansionPlanCard {
   id: string
   name: string
-  type: string
   supplierId: string
-  supplier: Supplier
-  demandMonthly: number
-  supplyMonthly: number
-  inventory: number
-  safetyStockMonths: number
-  singleSource: boolean
-  dependenceLevel: string | null
-  riskLevel: RiskLevel
-  riskDescription: string
-  supplyGap: number
-  gapRatio: number
-  actionCount: number
-  updatedAt: string
-  risks?: Risk[]
-  expansionPlans?: ExpansionPlan[]
-}
-
-export interface ActionTemplate {
-  type: string
-  title: string
-  description: string
-}
-
-export interface Action {
-  id: string
-  type: string
-  description: string
-  deadline: string
-  priority: string
-  status: string
-  completion: number
-  owner: Pick<User, 'id' | 'name' | 'title'>
-  task?: FollowTask | null
-}
-
-export interface Risk {
-  id: string
-  materialId: string
-  material: Material
-  type: string
-  level: RiskLevel
-  description: string
-  impactScope: string
-  discoveredAt: string
-  status: string
-  isAuto: boolean
-  actions: Action[]
-  templates?: ActionTemplate[]
-}
-
-export interface TaskUpdate {
-  id: number
-  progress: number
-  description: string
-  createdAt: string
-  author: Pick<User, 'id' | 'name'>
-}
-
-export interface Attachment {
-  id: number
-  fileName: string
-  mimeType: string
-  size: number
-  url: string
-  createdAt: string
-  uploadedBy?: Pick<User, 'id' | 'name'>
-}
-
-export interface FollowTask {
-  id: string
-  title: string
-  ownerId: string
-  owner: Pick<User, 'id' | 'name' | 'title' | 'avatarColor'>
-  collaboratorNames: string
-  startDate: string
-  deadline: string
-  progress: number
-  status: string
-  progressDescription: string
-  closedAt: string | null
-  updatedAt: string
-  action: Action & { risk: Risk }
-  updates: TaskUpdate[]
-  attachments: Attachment[]
-}
-
-export interface ExpansionItem {
-  id: number
-  type: string
-  name: string
-  vendor: string
-  orderNo: string
-  expectedArrival: string
-  actualArrival: string | null
-  status: string
-  delayDays: number
-  note: string
-}
-
-export interface ExpansionPlan {
-  id: string
-  name: string
-  materialId: string
-  material: Material
-  supplierId: string
-  supplier: Supplier
-  startDate: string
-  endDate: string
-  targetCapacity: number
-  investedCapex: number
-  totalCapex: number
-  fundingSources: string[]
+  supplierName: string
+  materialName: string
   stage: string
   progress: number
   expectedProgress: number
-  lag: number
   status: RiskLevel
+  lag: number
   riskTypes: string[]
-  riskDescription: string
-  owner: Pick<User, 'id' | 'name' | 'title'>
-  items: ExpansionItem[]
   updatedAt: string
 }
 
-export interface DashboardData {
-  summary: {
-    materialCount: number
-    supplierCount: number
-    demandTotal: number
-    supplyTotal: number
-    openRiskCount: number
-    activeTaskCount: number
-    overdueTaskCount: number
-    expansionPlanCount: number
-    expansionRiskCount: number
-  }
-  riskCounts: Record<RiskLevel, number>
-  typeDistribution: Array<{ type: string } & Record<RiskLevel, number>>
-  healthTrend: Array<{ week: string; score: number; date: string }>
-  gapAnalysis: Array<{ id: string; name: string; type: string; gap: number }>
-  topRisks: Material[]
-  materials: Material[]
+export interface ExpansionOverviewPayload {
+  board: string
+  view: string
+  generatedAt: string
+  kpis: Kpi[]
+  cards: ExpansionPlanCard[]
 }
 
-export interface Notification {
+export interface ExpansionMilestoneItem {
   id: number
+  name: string
+  type: string
+  vendor: string
+  orderNo: string
+  status: string
+  expectedArrival: string
+  actualArrival: string | null
+  delayDays: number
+  overdue: boolean
+}
+
+export interface ExpansionTimelineRow {
+  id: string
+  name: string
+  supplierName: string
+  materialName: string
+  startDate: string
+  endDate: string
+  stage: string
+  progress: number
+  expectedProgress: number
+  status: RiskLevel
+  lag: number
+  itemCount: number
+  overdueCount: number
+  items: ExpansionMilestoneItem[]
+}
+
+export interface ExpansionTimelinePayload {
+  board: string
+  view: string
+  generatedAt: string
+  kpis: Kpi[]
+  rows: ExpansionTimelineRow[]
+}
+
+export interface EvidenceItem {
+  id: number
+  category: string
+  categoryLabel: string
+  fileName: string
+  url: string
+  mimeType: string
+  size: number
+  note: string
+  uploaderName: string
+  uploadedAt: string
+}
+
+export interface EvidencePlanGroup {
+  planId: string
+  planName: string
+  supplierName: string
+  materialName: string
+  progress: number
+  status: string
+  evidenceCount: number
+  evidence: EvidenceItem[]
+}
+
+export interface ExpansionEvidencePayload {
+  board: string
+  view: string
+  generatedAt: string
+  kpis: Kpi[]
+  planGroups: EvidencePlanGroup[]
+  categoryCounts: Record<string, number>
+}
+
+export interface RiskRow {
+  id: string
   type: string
   level: RiskLevel
+  status: string
+  description: string
+  impactScope: string
+  materialName: string
+  supplierName: string
+  actionCount: number
+  openActionCount: number
+  discoveredAt: string
+}
+
+export interface RisksOverviewPayload {
+  board: string
+  view: string
+  generatedAt: string
+  kpis: Kpi[]
+  rows: RiskRow[]
+}
+
+export interface RisksByTypePayload {
+  board: string
+  view: string
+  generatedAt: string
+  kpis: Kpi[]
+  rows: Array<{
+    type: string
+    label: string
+    total: number
+    red: number
+    orange: number
+    yellow: number
+    green: number
+    risks: Array<{
+      id: string
+      level: RiskLevel
+      status: string
+      materialName: string
+      supplierName: string
+      description: string
+      openActions: number
+    }>
+  }>
+}
+
+export interface RisksEscalationPayload {
+  board: string
+  view: string
+  generatedAt: string
+  kpis: Kpi[]
+  pending: Array<{
+    id: string
+    type: string
+    level: RiskLevel
+    status: string
+    materialName: string
+    supplierName: string
+    description: string
+    actions: Array<{
+      id: string
+      type: string
+      status: string
+      deadline: string
+      taskId: string | null
+      taskStatus: string | null
+      taskProgress: number
+    }>
+  }>
+  active: RisksEscalationPayload['pending']
+  closed: RisksEscalationPayload['pending']
+}
+
+export interface RisksClosurePayload {
+  board: string
+  view: string
+  generatedAt: string
+  kpis: Kpi[]
+  rows: Array<{
+    id: string
+    type: string
+    materialName: string
+    supplierName: string
+    discoveredAt: string
+    closedAt: string
+    durationDays: number
+  }>
+  byType: Array<{ type: string; count: number }>
+}
+
+export interface TaskRow {
+  id: string
+  title: string
+  ownerName: string
+  ownerId?: string
+  progress: number
+  status: string
+  deadline: string
+  startDate?: string
+  daysToDeadline?: number
+  daysOverdue?: number
+  riskId?: string
+  riskLevel?: RiskLevel
+  riskType?: string
+  materialName?: string
+  supplierName?: string
+  actionType?: string
+  priority?: string
+  attachmentCount?: number
+  progressDescription?: string
+}
+
+export interface TasksMyTodoPayload {
+  board: string
+  view: string
+  generatedAt: string
+  kpis: Kpi[]
+  rows: TaskRow[]
+}
+
+export interface TasksOverduePayload {
+  board: string
+  view: string
+  generatedAt: string
+  kpis: Kpi[]
+  rows: TaskRow[]
+}
+
+export interface TasksEscalationPayload {
+  board: string
+  view: string
+  generatedAt: string
+  kpis: Kpi[]
+  remind: TaskRow[]
+  overdue: TaskRow[]
+  escalated: TaskRow[]
+}
+
+export interface TasksClosurePayload {
+  board: string
+  view: string
+  generatedAt: string
+  kpis: Kpi[]
+  rows: Array<{
+    id: string
+    title: string
+    ownerName: string
+    priority: string
+    riskType: string
+    closedAt: string
+    durationDays: number
+  }>
+  byPriority: Array<{ priority: string; count: number }>
+}
+
+export interface NotificationItem {
+  id: number
+  type: string
+  level: string
   title: string
   message: string
   link: string
@@ -181,7 +280,25 @@ export interface Notification {
   createdAt: string
 }
 
-export interface ReferenceData {
-  suppliers: Supplier[]
-  owners: Array<Pick<User, 'id' | 'name' | 'title'>>
+export interface BoardPayloadMap {
+  expansion: {
+    overview: ExpansionOverviewPayload
+    timeline: ExpansionTimelinePayload
+    evidence: ExpansionEvidencePayload
+  }
+  risks: {
+    overview: RisksOverviewPayload
+    'by-type': RisksByTypePayload
+    escalation: RisksEscalationPayload
+    closure: RisksClosurePayload
+  }
+  tasks: {
+    'my-todo': TasksMyTodoPayload
+    overdue: TasksOverduePayload
+    escalation: TasksEscalationPayload
+    closure: TasksClosurePayload
+  }
 }
+
+export type BoardId = keyof BoardPayloadMap
+export type ViewId<B extends BoardId> = keyof BoardPayloadMap[B]

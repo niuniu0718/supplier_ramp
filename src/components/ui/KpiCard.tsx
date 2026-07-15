@@ -1,31 +1,19 @@
 import type { LucideIcon } from 'lucide-react'
+import type { Kpi } from '../../types'
 
-export function KpiCard({
-  label,
-  value,
-  unit,
-  hint,
-  icon: Icon,
-  tone = 'blue',
-}: {
-  label: string
-  value: string | number
-  unit?: string
-  hint?: string
-  icon: LucideIcon
-  tone?: 'blue' | 'cyan' | 'green' | 'orange' | 'red' | 'purple'
-}) {
+interface KpiCardProps { kpi: Kpi; icon?: LucideIcon }
+export function KpiCard({ kpi, icon: Icon }: KpiCardProps) {
   return (
-    <div className="kpi-card">
-      <div className={`kpi-icon tone-${tone}`}><Icon size={21} /></div>
-      <div className="kpi-content">
-        <span className="kpi-label">{label}</span>
-        <div className="kpi-value-row">
-          <strong className="kpi-value">{value}</strong>
-          {unit && <span className="kpi-unit">{unit}</span>}
-        </div>
-        {hint && <span className="kpi-hint">{hint}</span>}
+    <article className={`kpi-card kpi-${kpi.tone ?? 'blue'}`}>
+      {Icon && <span className="kpi-icon"><Icon size={20} /></span>}
+      <div>
+        <span className="kpi-label">{kpi.label}</span>
+        <strong className="kpi-value">
+          {kpi.value}
+          {kpi.unit && <small>{kpi.unit}</small>}
+        </strong>
+        {kpi.hint && <small className="kpi-hint">{kpi.hint}</small>}
       </div>
-    </div>
+    </article>
   )
 }

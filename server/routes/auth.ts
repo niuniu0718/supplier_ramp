@@ -1,38 +1,28 @@
 import { Router } from 'express'
 import { prisma } from '../lib/prisma.js'
-import { asyncHandler } from '../lib/asyncHandler.js'
 
 export const authRouter = Router()
 
-authRouter.get('/demo-users', asyncHandler(async (_req, res) => {
+authRouter.get('/demo-users', async (_req, res) => {
   const users = await prisma.user.findMany({
-    where: { id: { in: ['U_MANAGER', 'U_ENGINEER', 'U_LEADER', 'U_SUPPLIER'] } },
-    select: {
-      id: true,
-      name: true,
-      role: true,
-      title: true,
-      avatarColor: true,
-      supplierId: true,
-      supplier: { select: { shortName: true } },
-    },
-    orderBy: { id: 'asc' },
+    select: { id: true, name: true, role: true, title: true, supplierId: true, avatarColor: true },
+    orderBy: [{ role: 'asc' }, { id: 'asc' }],
   })
-  res.json(users)
-}))
+  res.json({ users })
+})
 
-authRouter.get('/me', asyncHandler(async (req, res) => {
+authRouter.get('/me', async (req, res) => {
+  if (!req.currentUser) {
+    res.status(401).json({ message: '未指定身份。' })
+    return
+  }
   res.json(req.currentUser)
-}))
+})
 
-authRouter.get('/reference-data', asyncHandler(async (_req, res) => {
+authRouter.get('/reference-data', async (_req, res) => {
   const [suppliers, owners] = await Promise.all([
     prisma.supplier.findMany({ orderBy: { shortName: 'asc' } }),
-    prisma.user.findMany({
-      where: { role: { in: ['PROCUREMENT_ENGINEER', 'PROCUREMENT_MANAGER'] } },
-      select: { id: true, name: true, title: true },
-      orderBy: { name: 'asc' },
-    }),
+    prisma.user.findMany({ where: { role: { in: ['PROCUREMENT_MANAGER', 'PROCUREMENT_ENGINEER', 'DEPARTMENT_LEADER'] } } }),
   ])
   res.json({ suppliers, owners })
-}))
+})

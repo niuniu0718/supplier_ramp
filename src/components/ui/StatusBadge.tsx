@@ -1,41 +1,28 @@
 import type { RiskLevel } from '../../types'
 
-const labels: Record<string, string> = {
-  GREEN: '健康',
-  YELLOW: '关注',
-  ORANGE: '警告',
-  RED: '危险',
-  PENDING: '待评估',
-  ASSESSING: '待评估',
-  ACTION_DEFINED: '措施已定',
-  IN_PROGRESS: '进行中',
-  CLOSED: '已闭环',
-  IGNORED: '已忽略',
-  NOT_STARTED: '待启动',
-  COMPLETED: '已完成',
-  OVERDUE: '已逾期',
-  ON_HOLD: '已搁置',
+const LABELS: Record<RiskLevel, string> = {
+  GREEN: '绿色 · 健康',
+  YELLOW: '黄色 · 关注',
+  ORANGE: '橙色 · 警告',
+  RED: '红色 · 危险',
 }
 
-export function StatusBadge({ status, showDot = true }: { status: string; showDot?: boolean }) {
-  const color = (['GREEN', 'YELLOW', 'ORANGE', 'RED'] as RiskLevel[]).includes(status as RiskLevel)
-    ? status.toLowerCase()
-    : status === 'COMPLETED' || status === 'CLOSED' ? 'green'
-      : status === 'OVERDUE' ? 'red'
-        : status === 'IN_PROGRESS' || status === 'ACTION_DEFINED' ? 'blue'
-          : 'neutral'
+const SHORT: Record<RiskLevel, string> = {
+  GREEN: '绿',
+  YELLOW: '黄',
+  ORANGE: '橙',
+  RED: '红',
+}
+
+interface StatusBadgeProps { status: string; short?: boolean }
+export function StatusBadge({ status, short = false }: StatusBadgeProps) {
+  const tone = (['GREEN', 'YELLOW', 'ORANGE', 'RED'] as RiskLevel[]).includes(status as RiskLevel)
+    ? (status as RiskLevel)
+    : 'GREEN'
   return (
-    <span className={`status-badge status-${color}`}>
-      {showDot && <span className="status-dot" />}
-      {labels[status] ?? status}
+    <span className={`status-badge status-${tone.toLowerCase()}`}>
+      <span className="dot" />
+      {short ? SHORT[tone] : LABELS[tone]}
     </span>
   )
-}
-
-export function riskLabel(level: RiskLevel) {
-  return labels[level]
-}
-
-export function statusLabel(status: string) {
-  return labels[status] ?? status
 }

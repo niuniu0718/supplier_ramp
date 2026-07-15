@@ -1,42 +1,38 @@
-import { BarChart3, BatteryCharging, CheckSquare2, Factory, LayoutDashboard, ShieldAlert, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { AlertTriangle, CheckSquare, Factory } from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
 
-const navItems = [
-  { to: '/', label: '供需看板', description: '全局供需健康度', icon: LayoutDashboard },
-  { to: '/risks', label: '风险与措施', description: '识别风险并定措施', icon: ShieldAlert },
-  { to: '/tasks', label: '措施跟进', description: '任务执行与闭环', icon: CheckSquare2 },
-  { to: '/expansion', label: '扩产跟踪', description: '计划、里程碑与预警', icon: Factory },
+const NAV = [
+  { to: '/board/expansion/view/overview', label: '扩产跟踪', icon: Factory, color: '#2563eb' },
+  { to: '/board/risks/view/overview', label: '风险预警', icon: AlertTriangle, color: '#ef7d32' },
+  { to: '/board/tasks/view/my-todo', label: '措施跟进', icon: CheckSquare, color: '#18a875' },
 ]
 
-export function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
+export function Sidebar() {
+  const { username } = useAuth()
+
   return (
-    <>
-      {mobileOpen && <div className="sidebar-scrim" onClick={onClose} />}
-      <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
-        <div className="sidebar-brand">
-          <div className="brand-mark"><BatteryCharging size={22} /></div>
-          <div><strong>SUPPLY RAMP</strong><span>化学料供需管理系统</span></div>
-          <button className="icon-button sidebar-close" onClick={onClose}><X size={19} /></button>
+    <aside className="app-sidebar">
+      <div className="app-brand">
+        <span className="brand-dot" />
+        <div>
+          <strong>化学料扩产管控</strong>
+          <small>v2 · 本地版</small>
         </div>
-        <div className="sidebar-section-label">核心工作台</div>
-        <nav className="sidebar-nav">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            return (
-              <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={onClose} className={({ isActive }) => isActive ? 'active' : ''}>
-                <Icon size={19} />
-                <span><strong>{item.label}</strong><small>{item.description}</small></span>
-              </NavLink>
-            )
-          })}
-        </nav>
-        <div className="sidebar-spacer" />
-        <div className="sidebar-insight">
-          <BarChart3 size={18} />
-          <div><strong>本周数据已更新</strong><span>10 类物料 · 5 项扩产计划</span></div>
-        </div>
-        <div className="sidebar-footer">DEMO v1.0 · 2026</div>
-      </aside>
-    </>
+      </div>
+      <nav className="app-nav">
+        <span className="nav-eyebrow">采购驾驶舱</span>
+        {NAV.map((item) => (
+          <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item ${isActive ? 'is-active' : ''}`} end>
+            <item.icon size={18} color={item.color} />
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+      <div className="sidebar-foot">
+        <small>当前账号</small>
+        <strong>{username ?? '未登录'}</strong>
+      </div>
+    </aside>
   )
 }

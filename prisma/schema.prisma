@@ -8,23 +8,24 @@ datasource db {
 }
 
 model User {
-  id                String       @id
-  name              String
-  role              String
-  title             String
-  avatarColor       String       @default("#2563eb")
-  supplierId        String?
-  supplier          Supplier?    @relation(fields: [supplierId], references: [id])
-  ownedMaterials    Material[]   @relation("MaterialOwner")
-  createdRisks      Risk[]       @relation("RiskCreator")
-  recommendedActions Action[]    @relation("ActionRecommender")
-  ownedActions      Action[]     @relation("ActionOwner")
-  ownedTasks        FollowTask[] @relation("TaskOwner")
-  taskUpdates       TaskUpdate[]
-  attachments       Attachment[]
-  ownedPlans        ExpansionPlan[] @relation("PlanOwner")
-  notifications     Notification[]
-  createdAt         DateTime     @default(now())
+  id                  String             @id
+  name                String
+  role                String
+  title               String
+  avatarColor         String             @default("#2563eb")
+  supplierId          String?
+  supplier            Supplier?          @relation(fields: [supplierId], references: [id])
+  ownedMaterials      Material[]         @relation("MaterialOwner")
+  createdRisks        Risk[]             @relation("RiskCreator")
+  recommendedActions  Action[]           @relation("ActionRecommender")
+  ownedActions        Action[]           @relation("ActionOwner")
+  ownedTasks          FollowTask[]       @relation("TaskOwner")
+  collaboratedTasks   TaskCollaborator[]
+  taskUpdates         TaskUpdate[]
+  ownedPlans          ExpansionPlan[]    @relation("PlanOwner")
+  uploadedEvidence    EvidenceChain[]    @relation("EvidenceUploader")
+  notifications       Notification[]
+  createdAt           DateTime           @default(now())
 }
 
 model Supplier {
@@ -43,37 +44,25 @@ model Supplier {
 }
 
 model Material {
-  id                 String           @id
-  name               String
-  type               String
-  supplierId         String
-  supplier           Supplier         @relation(fields: [supplierId], references: [id])
-  demandMonthly      Float
-  supplyMonthly      Float
-  inventory          Float
-  safetyStockMonths  Float
-  singleSource       Boolean          @default(false)
-  dependenceLevel    String?
-  riskLevel          String           @default("GREEN")
-  riskDescription    String
-  ownerId            String
-  owner              User             @relation("MaterialOwner", fields: [ownerId], references: [id])
-  risks              Risk[]
-  healthSnapshots    HealthSnapshot[]
-  expansionPlans     ExpansionPlan[]
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-}
-
-model HealthSnapshot {
-  id         Int      @id @default(autoincrement())
-  materialId String
-  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  weekLabel  String
-  weekDate   DateTime
-  score      Int
-
-  @@unique([materialId, weekDate])
+  id                String           @id
+  name              String
+  type              String
+  supplierId        String
+  supplier          Supplier         @relation(fields: [supplierId], references: [id])
+  demandMonthly     Float
+  supplyMonthly     Float
+  inventory         Float
+  safetyStockMonths Float
+  singleSource      Boolean          @default(false)
+  dependenceLevel   String?
+  riskLevel         String           @default("GREEN")
+  riskDescription   String
+  ownerId           String
+  owner             User             @relation("MaterialOwner", fields: [ownerId], references: [id])
+  risks             Risk[]
+  expansionPlans    ExpansionPlan[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 }
 
 model Risk {
@@ -96,42 +85,53 @@ model Risk {
 }
 
 model Action {
-  id            String     @id
+  id            String      @id
   riskId        String
-  risk          Risk       @relation(fields: [riskId], references: [id])
+  risk          Risk        @relation(fields: [riskId], references: [id])
   type          String
   description   String
   recommenderId String
-  recommender   User       @relation("ActionRecommender", fields: [recommenderId], references: [id])
+  recommender   User        @relation("ActionRecommender", fields: [recommenderId], references: [id])
   ownerId       String
-  owner         User       @relation("ActionOwner", fields: [ownerId], references: [id])
+  owner         User        @relation("ActionOwner", fields: [ownerId], references: [id])
+  startDate     DateTime?
   deadline      DateTime
   priority      String
-  status        String     @default("NOT_STARTED")
-  completion    Int        @default(0)
+  status        String      @default("NOT_STARTED")
+  completion    Int         @default(0)
   task          FollowTask?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 model FollowTask {
-  id                  String       @id
-  actionId            String       @unique
-  action              Action       @relation(fields: [actionId], references: [id])
+  id                  String             @id
+  actionId            String             @unique
+  action              Action             @relation(fields: [actionId], references: [id])
   title               String
   ownerId             String
-  owner               User         @relation("TaskOwner", fields: [ownerId], references: [id])
-  collaboratorNames   String       @default("")
+  owner               User               @relation("TaskOwner", fields: [ownerId], references: [id])
+  collaborators       TaskCollaborator[]
   startDate           DateTime
   deadline            DateTime
-  progress             Int          @default(0)
-  status               String       @default("NOT_STARTED")
-  progressDescription String        @default("")
-  updates              TaskUpdate[]
-  attachments          Attachment[]
-  closedAt             DateTime?
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
+  progress            Int                @default(0)
+  status              String             @default("NOT_STARTED")
+  progressDescription String             @default("")
+  updates             TaskUpdate[]
+  attachments         Attachment[]
+  closedAt            DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+}
+
+model TaskCollaborator {
+  id     Int        @id @default(autoincrement())
+  taskId String
+  task   FollowTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User       @relation(fields: [userId], references: [id])
+
+  @@unique([taskId, userId])
 }
 
 model TaskUpdate {
@@ -149,13 +149,13 @@ model Attachment {
   id           Int        @id @default(autoincrement())
   taskId       String
   task         FollowTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  category     String     @default("OTHER")
   fileName     String
   storedName   String
   mimeType     String
   size         Int
   url          String
   uploadedById String
-  uploadedBy   User       @relation(fields: [uploadedById], references: [id])
   createdAt    DateTime   @default(now())
 }
 
@@ -171,18 +171,19 @@ model ExpansionPlan {
   targetCapacity   Float
   investedCapex    Float
   totalCapex       Float
-  fundingSources   String
+  fundingSources   Json
   stage            String
   progress         Int
-  expectedProgress Int
+  expectedProgress Int             @default(0)
   status           String
-  riskTypes        String
-  riskDescription  String
+  riskTypes        Json
+  riskDescription  String          @default("")
   ownerId          String
-  owner             User           @relation("PlanOwner", fields: [ownerId], references: [id])
-  items             ExpansionItem[]
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  owner            User            @relation("PlanOwner", fields: [ownerId], references: [id])
+  items            ExpansionItem[]
+  evidence         EvidenceChain[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
 model ExpansionItem {
@@ -192,12 +193,28 @@ model ExpansionItem {
   type            String
   name            String
   vendor          String
-  orderNo         String
+  orderNo         String        @default("")
   expectedArrival DateTime
   actualArrival   DateTime?
   status          String
   delayDays       Int           @default(0)
   note            String        @default("")
+}
+
+model EvidenceChain {
+  id           Int           @id @default(autoincrement())
+  planId       String
+  plan         ExpansionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  category     String
+  fileName     String
+  storedName   String
+  mimeType     String
+  size         Int
+  url          String
+  note         String        @default("")
+  uploadedById String
+  uploadedBy   User          @relation("EvidenceUploader", fields: [uploadedById], references: [id])
+  uploadedAt   DateTime      @default(now())
 }
 
 model Notification {

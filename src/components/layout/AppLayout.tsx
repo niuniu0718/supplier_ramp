@@ -1,15 +1,16 @@
-import { useState, type ReactNode } from 'react'
+import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 
-export function AppLayout({ children }: { children: ReactNode }) {
-  const [mobileOpen, setMobileOpen] = useState(false)
+export function AppLayout() {
   return (
     <div className="app-shell">
-      <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <Sidebar />
       <div className="app-main">
-        <Topbar onOpenMenu={() => setMobileOpen(true)} />
-        <main className="page-content">{children}</main>
+        <Topbar />
+        <main className="app-content">
+          <Outlet />
+        </main>
       </div>
     </div>
   )
