@@ -12,6 +12,7 @@ from ..config import settings
 from ..db import get_db
 from ..models import ExpansionItem, ExpansionPlan, EvidenceChain
 from ..security import require_session
+from ..services.milestone_template import milestone_name
 from ..services.risk_engine import (
     calculate_expansion_risk,
     calculate_expected_progress,
@@ -28,6 +29,7 @@ def _enrich_plan(plan: ExpansionPlan) -> Dict[str, Any]:
         "materialName": plan.material.name if plan.material else "",
         "supplierId": plan.supplier_id,
         "supplierName": plan.supplier.short_name if plan.supplier else "",
+        "supplierCategory": plan.supplier.category if plan.supplier else "",
         "name": plan.name,
         "stage": plan.stage,
         "startDate": plan.start_date.isoformat(),
@@ -68,6 +70,12 @@ def _enrich_item(it: ExpansionItem, min_start: float, total: float) -> Dict[str,
         "delayDays": delay,
         "overdue": overdue,
         "pct": pct,
+        "supplierAction": it.supplier_action,
+        "procurementAction": it.procurement_action,
+        "milestoneKey": it.milestone_key,
+        "milestoneOrder": it.milestone_order,
+        "milestoneName": milestone_name(it.milestone_key),
+        "note": it.note,
     }
 
 
@@ -148,7 +156,8 @@ def expansion_timeline(
     item_total = 0
     for p in plans:
         result = calculate_expansion_risk(p.start_date, p.end_date, p.progress)
-        items = [_enrich_item(it, min_start, total) for it in p.items]
+        sorted_items = sorted(p.items, key=lambda it: (it.milestone_order or 0, it.id))
+        items = [_enrich_item(it, min_start, total) for it in sorted_items]
         overdue = sum(1 for i in items if i["overdue"])
         overdue_total += overdue
         item_total += len(items)

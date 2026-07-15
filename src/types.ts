@@ -24,6 +24,7 @@ export interface ExpansionPlanCard {
   name: string
   supplierId: string
   supplierName: string
+  supplierCategory: string
   materialName: string
   stage: string
   progress: number
@@ -53,6 +54,12 @@ export interface ExpansionMilestoneItem {
   actualArrival: string | null
   delayDays: number
   overdue: boolean
+  supplierAction: string
+  procurementAction: string
+  note: string
+  milestoneKey: string
+  milestoneOrder: number
+  milestoneName: string
 }
 
 export interface ExpansionTimelineRow {

@@ -301,6 +301,35 @@ a { color: inherit; }
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 16px;
 }
+
+.category-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.category-group {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 18px 20px;
+}
+.category-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.category-group-title h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.category-group-title .muted {
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+}
 .plan-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -381,16 +410,6 @@ a { color: inherit; }
   gap: 10px;
 }
 
-.timeline-split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 16px;
-  align-items: start;
-}
-@media (max-width: 1100px) {
-  .timeline-split { grid-template-columns: 1fr; }
-}
-
 .timeline-gantt .panel-title {
   display: flex;
   align-items: center;
@@ -400,19 +419,22 @@ a { color: inherit; }
 
 .gantt-axis {
   position: relative;
-  height: 18px;
+  height: 44px;
   margin-left: 220px;
   margin-right: 80px;
   margin-bottom: 4px;
   border-bottom: 1px dashed var(--border);
 }
-.gantt-axis span {
+.gantt-axis-label {
   position: absolute;
-  bottom: 2px;
-  transform: translateX(-50%);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-muted);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
+.gantt-axis-up { top: 4px; }
+.gantt-axis-down { bottom: 4px; color: #b0b6c2; }
 
 .gantt-rows {
   display: flex;
@@ -428,14 +450,11 @@ a { color: inherit; }
   background: var(--surface-muted);
   border: 1px solid transparent;
   border-radius: 12px;
-  cursor: pointer;
-  text-align: left;
   font: inherit;
   color: inherit;
   transition: border-color .15s, background .15s;
 }
 .gantt-row:hover { border-color: var(--border); }
-.gantt-row.is-selected { border-color: var(--primary); background: #eef4ff; }
 .gantt-row-label strong { display: block; font-size: 13px; }
 .gantt-row-label small { color: var(--text-muted); font-size: 11px; }
 .gantt-row-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
@@ -443,32 +462,41 @@ a { color: inherit; }
 
 .gantt-track {
   position: relative;
-  height: 22px;
+  height: 30px;
   background: #eef2f7;
   border-radius: 999px;
 }
 .gantt-bar {
   position: absolute;
-  top: 4px;
-  bottom: 4px;
+  top: 8px;
+  bottom: 8px;
   border-radius: 999px;
-  opacity: 0.85;
+  opacity: 0.5;
 }
-.milestone {
+.milestone-dot {
   position: absolute;
-  top: -2px;
-  bottom: -2px;
-  width: 10px;
-  margin-left: -5px;
-  background: var(--surface);
-  border: 2px solid var(--primary);
-  transform: rotate(45deg);
-  border-radius: 2px;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  margin-top: -11px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--surface);
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+  font-variant-numeric: tabular-nums;
 }
-.milestone.is-overdue {
-  border-color: var(--red);
-  background: #ffe4e0;
-  box-shadow: 0 0 0 2px rgba(225, 56, 36, 0.18);
+.milestone-dot.tone-done { background: var(--green); }
+.milestone-dot.tone-progress { background: var(--orange); }
+.milestone-dot.tone-pending { background: #c8ced9; }
+.milestone-dot.tone-overdue { background: var(--red); }
+.milestone-dot.is-overdue {
+  box-shadow: 0 0 0 3px rgba(220, 63, 76, 0.25);
 }
 .gantt-expected {
   position: absolute;
@@ -495,45 +523,130 @@ a { color: inherit; }
   font-weight: 600;
 }
 
-.timeline-milestones .panel-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.timeline-milestones .panel-title strong { display: block; font-size: 13px; }
-.timeline-milestones .panel-title small { color: var(--text-muted); font-size: 11px; }
-
-.milestone-list {
+.timeline-all-milestones {
+  margin-top: 20px;
   display: flex;
   flex-direction: column;
+  gap: 18px;
 }
-.milestone-head {
+.timeline-all-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 2px;
+}
+.timeline-all-head strong { font-size: 15px; }
+.timeline-all-head small { font-size: 12px; }
+.timeline-plan-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px 18px;
+  box-shadow: var(--shadow);
+}
+.timeline-plan-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.timeline-plan-group-head strong { display: block; font-size: 14px; }
+.timeline-plan-group-head small { color: var(--text-muted); font-size: 11px; }
+
+.milestone-grid {
   display: grid;
-  grid-template-columns: 1fr 110px 110px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.milestone-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 220px;
+}
+.milestone-card.tone-done { border-left: 3px solid var(--green); }
+.milestone-card.tone-progress { border-left: 3px solid var(--orange); }
+.milestone-card.tone-pending { border-left: 3px solid #c8ced9; }
+.milestone-card.tone-overdue { border-left: 3px solid var(--red); }
+.milestone-card.is-overdue {
+  background: #fff8f7;
+}
+.milestone-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.milestone-step-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.milestone-card.tone-done .milestone-step-badge { background: var(--green); }
+.milestone-card.tone-progress .milestone-step-badge { background: var(--orange); }
+.milestone-card.tone-pending .milestone-step-badge { background: #c8ced9; }
+.milestone-card.tone-overdue .milestone-step-badge { background: var(--red); }
+.milestone-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.milestone-card-title strong { font-size: 13px; }
+.milestone-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.milestone-card-dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-  padding: 8px 12px;
   background: var(--surface-muted);
   border-radius: 8px;
-  font-size: 11px;
-  color: var(--text-muted);
+  padding: 6px 8px;
+}
+.milestone-card-dates small { display: block; font-size: 10px; margin-bottom: 1px; }
+.milestone-card-dates span { font-size: 12px; font-weight: 600; }
+.milestone-card-sides {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.milestone-side {
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+}
+.milestone-side-label {
+  font-size: 10px;
   font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 2px;
 }
-.milestone-row {
-  display: grid;
-  grid-template-columns: 1fr 110px 110px;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  align-items: center;
+.milestone-side p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text);
 }
-.milestone-row:last-child { border-bottom: none; }
-.milestone-row.is-overdue { background: #fff5f3; }
-.milestone-cell-main strong { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-.milestone-cell-main small { color: var(--text-muted); font-size: 11px; display: block; margin-top: 2px; }
-.milestone-cell-date { font-size: 12px; line-height: 1.4; }
-.milestone-cell-date small { display: block; }
-.milestone-cell-status { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.milestone-side-supplier { border-left: 3px solid var(--primary); }
+.milestone-side-procurement { border-left: 3px solid var(--purple); }
 .milestone-pill {
   display: inline-block;
   padding: 2px 8px;

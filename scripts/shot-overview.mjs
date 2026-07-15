@@ -1,0 +1,17 @@
+import { chromium } from 'playwright-core'
+const browser = await chromium.launch({ executablePath: '/usr/bin/chromium-browser' }).catch(() => chromium.launch())
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+const page = await ctx.newPage()
+const errors = []
+page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
+page.on('console', (msg) => { if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`) })
+await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle' })
+await page.fill('input[autocomplete="username"]', 'admin')
+await page.fill('input[autocomplete="current-password"]', 'admin123456')
+await page.click('button[type="submit"]')
+await page.waitForURL(/\/board/, { timeout: 5000 })
+await page.goto('http://localhost:5173/board/expansion/view/overview', { waitUntil: 'networkidle' })
+await page.waitForTimeout(800)
+await page.screenshot({ path: '/tmp/overview-grouped.png', fullPage: true })
+console.log('errors:', JSON.stringify(errors, null, 2))
+await browser.close()

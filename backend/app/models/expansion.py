@@ -57,6 +57,10 @@ class ExpansionItem(Base):
     status: Mapped[str] = mapped_column(String, default="已签")
     delay_days: Mapped[int] = mapped_column("delayDays", Integer, default=0)
     note: Mapped[str] = mapped_column(Text, default="")
+    supplier_action: Mapped[str] = mapped_column("supplierAction", Text, default="")
+    procurement_action: Mapped[str] = mapped_column("procurementAction", Text, default="")
+    milestone_key: Mapped[str] = mapped_column("milestoneKey", String, default="", index=True)
+    milestone_order: Mapped[int] = mapped_column("milestoneOrder", Integer, default=0)
 
     plan: Mapped[ExpansionPlan] = relationship(back_populates="items")
 
