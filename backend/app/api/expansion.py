@@ -10,8 +10,11 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
 from ..db import get_db
-from ..models import ExpansionItem, ExpansionPlan, EvidenceChain
+from ..models import Approval, CommissioningItem, ExpansionItem, ExpansionPlan, EvidenceChain, RampItem
 from ..security import require_session
+from ..services.approval_types import APPROVAL_BY_KEY
+from ..services.commissioning_types import COMMISSIONING_BY_KEY
+from ..services.ramp_phases import RAMP_BY_PHASE
 from ..services.milestone_template import milestone_name
 from ..services.risk_engine import (
     calculate_expansion_risk,
@@ -79,6 +82,82 @@ def _enrich_item(it: ExpansionItem, min_start: float, total: float) -> Dict[str,
     }
 
 
+def _enrich_approval(a: Approval) -> Dict[str, Any]:
+    tmpl = APPROVAL_BY_KEY.get(a.type, {"order": 99, "name": a.type, "agency": ""})
+    if a.actual_at:
+        status = "已完成"
+        overdue = False
+    elif not a.submitted_at:
+        status = "未开始"
+        overdue = False
+    elif a.expected_at and a.expected_at < datetime.utcnow():
+        status = "已逾期"
+        overdue = True
+    else:
+        status = "进行中"
+        overdue = False
+    return {
+        "order": tmpl.get("order", 99),
+        "type": a.type,
+        "name": tmpl.get("name", a.type),
+        "agency": tmpl.get("agency", ""),
+        "submittedAt": a.submitted_at.isoformat() if a.submitted_at else None,
+        "expectedAt": a.expected_at.isoformat() if a.expected_at else None,
+        "actualAt": a.actual_at.isoformat() if a.actual_at else None,
+        "status": status,
+        "overdue": overdue,
+        "note": a.note,
+    }
+
+
+PASS_STATUS_META = {
+    "PASS": "合格",
+    "FAIL": "不合格",
+    "IN_PROGRESS": "进行中",
+    "PENDING": "待开始",
+}
+
+
+def _enrich_commissioning(c: CommissioningItem) -> Dict[str, Any]:
+    tmpl = COMMISSIONING_BY_KEY.get(c.type, {"order": 99, "name": c.type, "standard": ""})
+    return {
+        "order": tmpl.get("order", 99),
+        "type": c.type,
+        "name": tmpl.get("name", c.type),
+        "standard": tmpl.get("standard", ""),
+        "targetValue": c.target_value,
+        "actualValue": c.actual_value,
+        "passStatus": c.pass_status,
+        "passLabel": PASS_STATUS_META.get(c.pass_status, c.pass_status),
+        "verifiedAt": c.verified_at.isoformat() if c.verified_at else None,
+        "note": c.note,
+    }
+
+
+RAMP_STATUS_META = {
+    "PASS": "已达标",
+    "FAIL": "未达标",
+    "IN_PROGRESS": "进行中",
+    "PENDING": "待开始",
+}
+
+
+def _enrich_ramp(r: RampItem) -> Dict[str, Any]:
+    tmpl = RAMP_BY_PHASE.get(r.phase, {"order": 99, "loadRate": r.target_load_rate, "period": ""})
+    return {
+        "order": tmpl.get("order", 99),
+        "phase": r.phase,
+        "loadRate": r.target_load_rate,
+        "targetCapacity": r.target_capacity,
+        "plannedPeriod": r.planned_period or tmpl.get("period", ""),
+        "confirmedAt": r.confirmed_at.isoformat() if r.confirmed_at else None,
+        "actualCapacity": r.actual_capacity,
+        "status": r.status,
+        "statusLabel": RAMP_STATUS_META.get(r.status, r.status),
+        "note": r.note,
+    }
+
+
 @router.get("/expansion-plans")
 def list_plans(
     db: Session = Depends(get_db),
@@ -137,7 +216,8 @@ def expansion_timeline(
     plans = (
         db.query(ExpansionPlan)
         .options(selectinload(ExpansionPlan.supplier), selectinload(ExpansionPlan.material),
-                selectinload(ExpansionPlan.items))
+                selectinload(ExpansionPlan.items), selectinload(ExpansionPlan.approvals),
+                selectinload(ExpansionPlan.commissionings), selectinload(ExpansionPlan.ramps))
         .order_by(ExpansionPlan.start_date.asc())
         .all()
     )
@@ -175,6 +255,9 @@ def expansion_timeline(
             "lag": result.lag,
             "itemCount": len(items),
             "overdueCount": overdue,
+            "approvals": [_enrich_approval(a) for a in sorted(p.approvals, key=lambda x: APPROVAL_BY_KEY.get(x.type, {}).get("order", 99))],
+            "commissionings": [_enrich_commissioning(c) for c in sorted(p.commissionings, key=lambda x: COMMISSIONING_BY_KEY.get(x.type, {}).get("order", 99))],
+            "ramps": [_enrich_ramp(r) for r in sorted(p.ramps, key=lambda x: RAMP_BY_PHASE.get(x.phase, {}).get("order", 99))],
             "items": items,
         })
 

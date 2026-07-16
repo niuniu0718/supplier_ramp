@@ -76,7 +76,49 @@ export interface ExpansionTimelineRow {
   lag: number
   itemCount: number
   overdueCount: number
+  approvals: ApprovalRow[]
+  commissionings: CommissioningRow[]
+  ramps: RampRow[]
   items: ExpansionMilestoneItem[]
+}
+
+export interface ApprovalRow {
+  order: number
+  type: string
+  name: string
+  agency: string
+  submittedAt: string | null
+  expectedAt: string | null
+  actualAt: string | null
+  status: '未开始' | '进行中' | '已完成' | '已逾期'
+  overdue: boolean
+  note: string
+}
+
+export interface CommissioningRow {
+  order: number
+  type: string
+  name: string
+  standard: string
+  targetValue: string
+  actualValue: string
+  passStatus: 'PASS' | 'FAIL' | 'IN_PROGRESS' | 'PENDING'
+  passLabel: string
+  verifiedAt: string | null
+  note: string
+}
+
+export interface RampRow {
+  order: number
+  phase: string
+  loadRate: number
+  targetCapacity: number
+  plannedPeriod: string
+  confirmedAt: string | null
+  actualCapacity: number | null
+  status: 'PASS' | 'FAIL' | 'IN_PROGRESS' | 'PENDING'
+  statusLabel: string
+  note: string
 }
 
 export interface ExpansionTimelinePayload {

@@ -1,8 +1,4 @@
 import {
-  AlertTriangle,
-  CheckCircle2,
-  Circle,
-  Clock,
   Factory,
   FileCheck,
   FlaskConical,
@@ -22,14 +18,14 @@ export interface MilestoneTemplate {
 }
 
 export const MILESTONE_TEMPLATE: MilestoneTemplate[] = [
-  { order: 1, key: 'FEASIBILITY', name: '立项批复', icon: FileCheck },
-  { order: 2, key: 'EIA', name: '环评安评', icon: Leaf },
-  { order: 3, key: 'EQUIPMENT_ORDER', name: '设备采购签约', icon: ShoppingCart },
-  { order: 4, key: 'CIVIL', name: '土建竣工', icon: HardHat },
-  { order: 5, key: 'EQUIPMENT_DELIVERY', name: '设备到货', icon: Truck },
-  { order: 6, key: 'INSTALLATION', name: '安装调试', icon: Wrench },
-  { order: 7, key: 'TRIAL_PRODUCTION', name: '试生产', icon: FlaskConical },
-  { order: 8, key: 'FULL_PRODUCTION', name: '正式投产', icon: Factory },
+  { order: 1, key: 'FEASIBILITY', name: '需求确认与可行性研究', icon: FileCheck },
+  { order: 2, key: 'EIA', name: '项目立项与审批', icon: Leaf },
+  { order: 3, key: 'EQUIPMENT_ORDER', name: '工艺设计与工程', icon: ShoppingCart },
+  { order: 4, key: 'CIVIL', name: '政府审批与许可', icon: HardHat },
+  { order: 5, key: 'EQUIPMENT_DELIVERY', name: '施工建设与安装', icon: Truck },
+  { order: 6, key: 'INSTALLATION', name: '试车验证与考核', icon: Wrench },
+  { order: 7, key: 'TRIAL_PRODUCTION', name: '客户认证与审核', icon: FlaskConical },
+  { order: 8, key: 'FULL_PRODUCTION', name: '量产爬坡与优化', icon: Factory },
 ]
 
 export const MILESTONE_BY_KEY: Record<string, MilestoneTemplate> = Object.fromEntries(

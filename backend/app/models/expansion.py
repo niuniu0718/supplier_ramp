@@ -41,6 +41,9 @@ class ExpansionPlan(Base):
     supplier: Mapped[Supplier] = relationship(back_populates="expansion_plans")
     items: Mapped[List[ExpansionItem]] = relationship(back_populates="plan", cascade="all, delete-orphan")
     evidence: Mapped[List[EvidenceChain]] = relationship(back_populates="plan", cascade="all, delete-orphan")
+    approvals: Mapped[List[Approval]] = relationship(back_populates="plan", cascade="all, delete-orphan")
+    commissionings: Mapped[List[CommissioningItem]] = relationship(back_populates="plan", cascade="all, delete-orphan")
+    ramps: Mapped[List[RampItem]] = relationship(back_populates="plan", cascade="all, delete-orphan")
 
 
 class ExpansionItem(Base):
@@ -81,3 +84,49 @@ class EvidenceChain(Base):
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     plan: Mapped[ExpansionPlan] = relationship(back_populates="evidence")
+
+
+class Approval(Base):
+    __tablename__ = "approval"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    plan_id: Mapped[str] = mapped_column("planId", String, ForeignKey("expansion_plan.id", ondelete="CASCADE"), index=True)
+    type: Mapped[str] = mapped_column(String)
+    submitted_at: Mapped[Optional[datetime]] = mapped_column("submittedAt", DateTime, nullable=True)
+    expected_at: Mapped[Optional[datetime]] = mapped_column("expectedAt", DateTime, nullable=True)
+    actual_at: Mapped[Optional[datetime]] = mapped_column("actualAt", DateTime, nullable=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+
+    plan: Mapped[ExpansionPlan] = relationship(back_populates="approvals")
+
+
+class CommissioningItem(Base):
+    __tablename__ = "commissioning_item"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    plan_id: Mapped[str] = mapped_column("planId", String, ForeignKey("expansion_plan.id", ondelete="CASCADE"), index=True)
+    type: Mapped[str] = mapped_column(String, index=True)
+    target_value: Mapped[str] = mapped_column("targetValue", String, default="")
+    actual_value: Mapped[str] = mapped_column("actualValue", String, default="")
+    pass_status: Mapped[str] = mapped_column("passStatus", String, default="PENDING")
+    verified_at: Mapped[Optional[datetime]] = mapped_column("verifiedAt", DateTime, nullable=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+
+    plan: Mapped[ExpansionPlan] = relationship(back_populates="commissionings")
+
+
+class RampItem(Base):
+    __tablename__ = "ramp_item"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    plan_id: Mapped[str] = mapped_column("planId", String, ForeignKey("expansion_plan.id", ondelete="CASCADE"), index=True)
+    phase: Mapped[str] = mapped_column(String, index=True)
+    target_load_rate: Mapped[int] = mapped_column("targetLoadRate", Integer)
+    target_capacity: Mapped[float] = mapped_column("targetCapacity", Float)
+    planned_period: Mapped[str] = mapped_column("plannedPeriod", String, default="")
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column("confirmedAt", DateTime, nullable=True)
+    actual_capacity: Mapped[Optional[float]] = mapped_column("actualCapacity", Float, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="PENDING")
+    note: Mapped[str] = mapped_column(Text, default="")
+
+    plan: Mapped[ExpansionPlan] = relationship(back_populates="ramps")

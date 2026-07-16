@@ -1,17 +1,17 @@
 import type { RiskLevel } from '../../types'
 
 const LABELS: Record<RiskLevel, string> = {
-  GREEN: '绿色 · 健康',
-  YELLOW: '黄色 · 关注',
-  ORANGE: '橙色 · 警告',
-  RED: '红色 · 危险',
+  GREEN: '低风险',
+  YELLOW: '中风险',
+  ORANGE: '中风险',
+  RED: '高风险',
 }
 
 const SHORT: Record<RiskLevel, string> = {
-  GREEN: '绿',
-  YELLOW: '黄',
-  ORANGE: '橙',
-  RED: '红',
+  GREEN: '低',
+  YELLOW: '中',
+  ORANGE: '中',
+  RED: '高',
 }
 
 interface StatusBadgeProps { status: string; short?: boolean }

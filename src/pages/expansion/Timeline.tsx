@@ -1,12 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, ChevronDown, type LucideIcon } from 'lucide-react'
 import { BoardShell } from '../../components/layout/BoardShell'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { ErrorState, LoadingState } from '../../components/ui/States'
 import { api } from '../../lib/api'
+import { APPROVAL_CYCLE_BY_KEY, approvalStatusMeta } from '../../lib/approval'
 import { MILESTONE_TEMPLATE, milestoneStatusMeta } from '../../lib/milestone'
-import type { ExpansionMilestoneItem, ExpansionTimelinePayload, ExpansionTimelineRow } from '../../types'
+import { COMMISSIONING_TYPES, commissioningStatusMeta } from '../../lib/commissioning'
+import { RAMP_PHASES, rampStatusMeta } from '../../lib/ramp'
+import type {
+  ApprovalRow,
+  CommissioningRow,
+  ExpansionMilestoneItem,
+  ExpansionTimelinePayload,
+  ExpansionTimelineRow,
+  RampRow,
+} from '../../types'
 
 const VIEWS = [
   { to: '/board/expansion/view/overview', label: '进度总览' },
@@ -14,18 +24,35 @@ const VIEWS = [
   { to: '/board/expansion/view/evidence', label: '证据档案' },
 ]
 
-const STATUS_COLOR: Record<string, string> = {
-  GREEN: 'var(--green)',
-  YELLOW: 'var(--yellow)',
-  ORANGE: 'var(--orange)',
-  RED: 'var(--red)',
-}
-
 const MS_DAY = 86_400_000
 const MS_MONTH = 30 * MS_DAY
 
+const PILL_META: Record<string, { label: string; color: string; bg: string }> = {
+  done: { label: '已完成', color: 'var(--green)', bg: '#e6f8f1' },
+  progress: { label: '进行中', color: 'var(--orange)', bg: '#fff0e3' },
+  pending: { label: '待开始', color: 'var(--text-muted)', bg: '#eef2f7' },
+  overdue: { label: '已逾期', color: 'var(--red)', bg: '#ffe4e0' },
+}
+
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
+  const d = new Date(iso)
+  const yy = String(d.getFullYear()).slice(2)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yy}/${mm}/${dd}`
+}
+
+function fmtDateOpt(iso: string | null) {
+  return iso ? fmtDate(iso) : '—'
+}
+
+function fmtYM(iso: string | null) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  const yy = String(d.getFullYear()).slice(2)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yy}/${mm}/${dd}`
 }
 
 export function ExpansionTimeline() {
@@ -80,13 +107,15 @@ export function ExpansionTimeline() {
   const maxEnd = Math.max(...ends)
   const total = maxEnd - minStart
 
-  const overdueItems = data.rows.reduce((sum, r) => sum + r.overdueCount, 0)
-  const totalItems = data.rows.reduce((sum, r) => sum + r.items.length, 0)
   const completedMilestones = data.rows.reduce(
     (sum, r) => sum + r.items.filter((it) => milestoneStatusMeta(it.status).tone === 'done').length,
     0,
   )
   const allItems = data.rows.flatMap((r) => r.items)
+  const allApprovals = data.rows.flatMap((r) => r.approvals)
+  const approvalTotal = allApprovals.length
+  const approvalDone = allApprovals.filter((a) => a.status === '已完成').length
+  const approvalOverdue = allApprovals.filter((a) => a.status === '已逾期').length
 
   return (
     <BoardShell
@@ -108,13 +137,23 @@ export function ExpansionTimeline() {
           }}
         />,
         <KpiCard
-          key="overdue"
+          key="approval-done"
           kpi={{
-            label: '逾期阀点',
-            value: overdueItems,
-            unit: `/${totalItems}`,
-            tone: overdueItems > 0 ? 'red' : 'green',
-            hint: overdueItems > 0 ? '需介入' : '全部按时',
+            label: '已批审批',
+            value: approvalDone,
+            unit: `/${approvalTotal}`,
+            tone: 'green',
+            hint: `5 家累计已批复数`,
+          }}
+        />,
+        <KpiCard
+          key="approval-overdue"
+          kpi={{
+            label: '逾期审批',
+            value: approvalOverdue,
+            unit: `/${approvalTotal}`,
+            tone: approvalOverdue > 0 ? 'red' : 'green',
+            hint: approvalOverdue > 0 ? '需催办' : '全部按时',
           }}
         />,
       ]}
@@ -124,6 +163,24 @@ export function ExpansionTimeline() {
           <strong>扩产甘特图</strong>
           <small className="muted">每行 8 个标准阀点</small>
         </header>
+        <div className="gantt-legend">
+          <span className="gantt-legend-item tone-done">
+            <span className="dot">✓</span>已完成
+          </span>
+          <span className="gantt-legend-item tone-progress">
+            <span className="dot">◐</span>进行中
+          </span>
+          <span className="gantt-legend-item is-overdue">
+            <span className="dot">!</span>已逾期
+          </span>
+          <span className="gantt-legend-item tone-pending">
+            <span className="dot">○</span>待开始
+          </span>
+          <span className="gantt-legend-sep">|</span>
+          <span className="gantt-legend-item gantt-legend-expected">
+            <span className="dot">今</span>今日位置
+          </span>
+        </div>
         <div className="gantt-axis">
           {axis.labels.map((m, idx) => (
             <span
@@ -146,12 +203,22 @@ export function ExpansionTimeline() {
               (it) => milestoneStatusMeta(it.status).tone === 'done',
             ).length
             return (
-              <div key={row.id} className="gantt-row">
+              <div key={row.id} className="gantt-row" data-plan-id={row.id}>
                 <div className="gantt-row-label">
-                  <strong>{row.name}</strong>
+                  <button
+                    type="button"
+                    className="gantt-row-name"
+                    onClick={() => {
+                      const el = document.getElementById(`plan-group-${row.id}`)
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }}
+                    title="点击跳转到该计划的阀点明细与审批/验证记录"
+                  >
+                    <strong>{row.name}</strong>
+                    <ChevronDown size={12} className="gantt-row-jump" />
+                  </button>
                   <small>{row.supplierName} · {row.materialName}</small>
                   <div className="gantt-row-meta">
-                    <span className="stage">{row.stage}</span>
                     <StatusBadge status={row.status} short />
                     <span className="evidence-tag" style={{ background: '#e6f8f1', color: 'var(--green)' }}>
                       {completedCount}/8 已完成
@@ -169,26 +236,40 @@ export function ExpansionTimeline() {
                     style={{
                       left: `${seg.left}%`,
                       width: `${seg.width}%`,
-                      background: STATUS_COLOR[row.status] ?? 'var(--primary)',
                     }}
                   />
                   {MILESTONE_TEMPLATE.map((m, idx) => {
                     const item = row.items.find((it) => it.milestoneKey === m.key)
-                    const pct = 4 + (idx / 7) * 92
                     const meta = item ? milestoneStatusMeta(item.status) : null
                     const overdue = item?.overdue
+                    const tone = overdue ? 'overdue' : meta?.tone ?? 'pending'
+                    const number = idx + 1
+                    const msTime = item ? new Date(item.expectedArrival).getTime() : null
+                    const pct =
+                      msTime && total > 0
+                        ? Math.max(0, Math.min(100, ((msTime - minStart) / total) * 100))
+                        : 4 + (idx / 7) * 92
+                    const showTip = true
+                    const tipLines = item
+                      ? [
+                          `阀点 ${number} · ${m.name}`,
+                          `状态：${meta?.label ?? item.status}`,
+                          `计划：${fmtYM(item.expectedArrival)}`,
+                          `实际：${item.actualArrival ? fmtYM(item.actualArrival) : '—'}`,
+                          overdue ? `逾期 ${item.delayDays} 天` : '',
+                        ].filter(Boolean)
+                      : [`阀点 ${number} · ${m.name}`, '状态：未开始']
                     return (
                       <span
                         key={m.key}
-                        className={`milestone-dot ${meta?.tone ?? 'pending'} ${overdue ? 'is-overdue' : ''}`}
+                        className={`milestone-dot tone-${tone} ${overdue ? 'is-overdue' : ''}`}
                         style={{ left: `${pct}%` }}
-                        title={
-                          item
-                            ? `${idx + 1}. ${m.name} · ${meta?.label ?? item.status}${overdue ? ` · 逾期 ${item.delayDays} 天` : ''}`
-                            : `${idx + 1}. ${m.name} · 未开始`
-                        }
+                        {...(showTip ? { 'data-tip': tipLines.join('\n') } : {})}
                       >
-                        {idx + 1}
+                        <span className="milestone-dot-number">{number}</span>
+                        <span className={`milestone-dot-icon icon-${tone}`}>
+                          {tone === 'done' ? '✓' : tone === 'progress' ? '◐' : tone === 'overdue' ? '!' : ''}
+                        </span>
                       </span>
                     )
                   })}
@@ -205,12 +286,8 @@ export function ExpansionTimeline() {
       </article>
 
       <section className="timeline-all-milestones">
-        <header className="timeline-all-head">
-          <strong>全部阀点明细（共 {allItems.length} 项 · 每计划 8 个标准阶段）</strong>
-          <small className="muted">每张卡片包含：阀点序号 · 名称 · 状态 · 计划/实际日期 · 供应商侧 · 采购侧</small>
-        </header>
         {data.rows.map((row) => (
-          <div key={row.id} className="timeline-plan-group">
+          <div key={row.id} id={`plan-group-${row.id}`} className="timeline-plan-group">
             <header className="timeline-plan-group-head">
               <div>
                 <strong>{row.name}</strong>
@@ -218,20 +295,35 @@ export function ExpansionTimeline() {
               </div>
               <StatusBadge status={row.status} short />
             </header>
-            <div className="milestone-grid">
-              {MILESTONE_TEMPLATE.map((tmpl, idx) => {
-                const item = row.items.find((it) => it.milestoneKey === tmpl.key)
-                return (
-                  <MilestoneCard
-                    key={tmpl.key}
-                    order={idx + 1}
-                    templateName={tmpl.name}
-                    TemplateIcon={tmpl.icon}
-                    item={item}
-                  />
-                )
-              })}
-            </div>
+            <section className="timeline-plan-section">
+              <header className="timeline-plan-section-head">
+                <strong>全部阀点明细</strong>
+                <small className="muted">8 个标准阶段 · 卡片包含阀点序号/名称/状态/计划&实际日期/双方行动</small>
+              </header>
+              <div className="milestone-grid">
+                {MILESTONE_TEMPLATE.map((tmpl, idx) => {
+                  const item = row.items.find((it) => it.milestoneKey === tmpl.key)
+                  return (
+                    <MilestoneCard
+                      key={tmpl.key}
+                      order={idx + 1}
+                      templateName={tmpl.name}
+                      TemplateIcon={tmpl.icon}
+                      item={item}
+                    />
+                  )
+                })}
+              </div>
+            </section>
+            <section className="timeline-plan-section">
+              <ApprovalSection approvals={row.approvals} />
+            </section>
+            <section className="timeline-plan-section">
+              <CommissioningSection commissionings={row.commissionings} />
+            </section>
+            <section className="timeline-plan-section">
+              <RampSection ramps={row.ramps} />
+            </section>
           </div>
         ))}
       </section>
@@ -259,28 +351,29 @@ interface MilestoneCardProps {
 function MilestoneCard({ order, templateName, TemplateIcon, item }: MilestoneCardProps) {
   const meta = item ? milestoneStatusMeta(item.status) : milestoneStatusMeta('待开始')
   const Icon = item ? TemplateIcon : TemplateIcon
+  const overdue = item?.overdue ?? false
+  const tone = overdue ? 'overdue' : meta.tone
+  const pillMeta = PILL_META[tone]
   return (
-    <div className={`milestone-card ${item?.overdue ? 'is-overdue' : ''} tone-${meta.tone}`}>
+    <div className={`milestone-card ${overdue ? 'is-overdue' : ''} tone-${tone}`}>
       <header className="milestone-card-head">
         <span className="milestone-step-badge">{order}</span>
         <div className="milestone-card-title">
           <Icon size={14} color={meta.color} />
           <strong>{templateName}</strong>
         </div>
-      </header>
-      <div className="milestone-card-meta">
         <span
           className="milestone-pill"
-          style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.ring}40` }}
+          style={{ background: pillMeta.bg, color: pillMeta.color, border: `1px solid ${pillMeta.color}40` }}
         >
-          {item?.status ?? '待开始'}
+          {pillMeta.label}
         </span>
-        {item?.overdue && (
+        {overdue && (
           <span className="overdue-badge">
-            <AlertTriangle size={11} /> 逾期 {item.delayDays} 天
+            <AlertTriangle size={11} /> 逾期 {item?.delayDays ?? 0} 天
           </span>
         )}
-      </div>
+      </header>
       <div className="milestone-card-dates">
         <div>
           <small className="muted">计划</small>
@@ -304,5 +397,176 @@ function MilestoneCard({ order, templateName, TemplateIcon, item }: MilestoneCar
         </div>
       </div>
     </div>
+  )
+}
+
+function ApprovalSection({ approvals }: { approvals: ApprovalRow[] }) {
+  if (!approvals.length) return null
+  return (
+    <section className="approval-progress">
+      <header className="timeline-plan-section-head">
+        <strong>关键审批事项进度</strong>
+        <small className="muted">6 项前置审批 · 状态自动按日期推算 · 鼠标悬浮审批事项查看准备周期</small>
+      </header>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>审批事项</th>
+            <th>审批机构</th>
+            <th className="date">提交日期</th>
+            <th className="date">预计批复</th>
+            <th className="date">实际批复</th>
+            <th>状态</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          {approvals.map((a) => {
+            const meta = approvalStatusMeta(a.status)
+            return (
+              <tr key={a.type} className={a.overdue ? 'is-overdue' : ''}>
+                <td className="approval-item" data-cycle={APPROVAL_CYCLE_BY_KEY[a.type] ?? ''}>
+                  <strong>{a.order}. {a.name}</strong>
+                </td>
+                <td>{a.agency}</td>
+                <td className="date">{fmtYM(a.submittedAt)}</td>
+                <td className="date">{fmtYM(a.expectedAt)}</td>
+                <td className="date">{fmtYM(a.actualAt)}</td>
+                <td>
+                  <span
+                    className="milestone-pill"
+                    style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.ring}40` }}
+                  >
+                    {meta.label}
+                  </span>
+                </td>
+                <td className="muted">{a.note || '—'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </section>
+  )
+}
+
+function CommissioningSection({ commissionings }: { commissionings: CommissioningRow[] }) {
+  if (!commissionings.length) return null
+  return (
+    <section className="commissioning-progress">
+      <header className="timeline-plan-section-head">
+        <strong>试车验证记录</strong>
+        <small className="muted">6 项验证项目 · 含目标值/实测值/合格判定/验证日期/备注</small>
+      </header>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>验证项目</th>
+            <th>验证标准</th>
+            <th>目标值</th>
+            <th>实测值</th>
+            <th>合格判定</th>
+            <th className="date">验证日期</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          {COMMISSIONING_TYPES.map((tmpl) => {
+            const row = commissionings.find((c) => c.type === tmpl.key)
+            const meta = row ? commissioningStatusMeta(row.passStatus) : commissioningStatusMeta('PENDING')
+            return (
+              <tr key={tmpl.key} className={row?.passStatus === 'FAIL' ? 'is-fail' : ''}>
+                <td>
+                  <strong>{tmpl.order}. {tmpl.name}</strong>
+                </td>
+                <td className="muted">{tmpl.standard}</td>
+                <td>{row?.targetValue || '—'}</td>
+                <td className={row?.actualValue ? '' : 'muted'}>
+                  {row?.actualValue || '—'}
+                </td>
+                <td>
+                  <span
+                    className="milestone-pill"
+                    style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.color}40` }}
+                  >
+                    {row?.passLabel ?? '待开始'}
+                  </span>
+                </td>
+                <td className="date">{row?.verifiedAt ? fmtDate(row.verifiedAt) : '—'}</td>
+                <td className="muted">{row?.note || '—'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </section>
+  )
+}
+
+function RampSection({ ramps }: { ramps: RampRow[] }) {
+  if (!ramps.length) return null
+  return (
+    <section className="ramp-progress">
+      <header className="timeline-plan-section-head">
+        <strong>量产爬坡计划跟踪</strong>
+        <small className="muted">4 阶段爬坡 · 负荷率 40→100% · 含目标/实际产能与达标判定</small>
+      </header>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>阶段</th>
+            <th className="number">目标负荷率</th>
+            <th className="number">目标产能（吨/月）</th>
+            <th>计划周期</th>
+            <th className="date">实际确认时间</th>
+            <th className="number">实际达成产能</th>
+            <th>达标状态</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          {RAMP_PHASES.map((tmpl) => {
+            const row = ramps.find((r) => r.phase === tmpl.phase)
+            const meta = row ? rampStatusMeta(row.status) : rampStatusMeta('PENDING')
+            const reached = row?.actualCapacity != null && row.targetCapacity > 0
+              ? Math.round((row.actualCapacity / row.targetCapacity) * 100)
+              : null
+            return (
+              <tr key={tmpl.phase} className={row?.status === 'FAIL' ? 'is-fail' : ''}>
+                <td>
+                  <strong>{tmpl.phase}</strong>
+                  <div className="muted" style={{ fontSize: 11 }}>{tmpl.period}</div>
+                </td>
+                <td className="number">{tmpl.loadRate}%</td>
+                <td className="number">{(row?.targetCapacity ?? tmpl.loadRate * 1000).toLocaleString()}</td>
+                <td>{row?.plannedPeriod ?? tmpl.period}</td>
+                <td className="date">{row?.confirmedAt ? fmtDate(row.confirmedAt) : '—'}</td>
+                <td className="number">
+                  {row?.actualCapacity != null ? (
+                    <>
+                      {row.actualCapacity.toLocaleString()}
+                      {reached != null && (
+                        <span className="muted" style={{ marginLeft: 4, fontSize: 11 }}>
+                          ({reached}%)
+                        </span>
+                      )}
+                    </>
+                  ) : '—'}
+                </td>
+                <td>
+                  <span
+                    className="milestone-pill"
+                    style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.color}40` }}
+                  >
+                    {row?.statusLabel ?? '待开始'}
+                  </span>
+                </td>
+                <td className="muted">{row?.note || '—'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </section>
   )
 }

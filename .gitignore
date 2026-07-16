@@ -11,3 +11,6 @@ uploads/*
 !uploads/.gitkeep
 .DS_Store
 .claude/
+
+# 离线依赖压缩包允许入库（公司 npm install 超时用）
+!frontend-deps-*.tar.gz

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.db import SessionLocal, init_db
 from app.models import (
     Action,
+    Approval,
     Attachment,
     ExpansionItem,
     ExpansionPlan,
@@ -446,6 +447,125 @@ PLANS = [
 ]
 
 
+APPROVALS = [
+    # P001 二期碳酸锂 38% — 安装期：4 项已完成，排污进行中，危化品已逾期
+    {"plan_id": "P001", "type": "EIA", "submitted_at": months_ago(10), "expected_at": months_ago(9), "actual_at": months_ago(9), "note": "环评批复同步取得"},
+    {"plan_id": "P001", "type": "SAFETY_PRE", "submitted_at": months_ago(9), "expected_at": months_ago(8), "actual_at": months_ago(8), "note": ""},
+    {"plan_id": "P001", "type": "EMISSION_PERMIT", "submitted_at": months_ago(2), "expected_at": months_ahead(1), "actual_at": None, "note": "材料受理中"},
+    {"plan_id": "P001", "type": "ENERGY_REVIEW", "submitted_at": months_ago(11), "expected_at": months_ago(10), "actual_at": months_ago(10), "note": ""},
+    {"plan_id": "P001", "type": "HAZMAT_PRODUCTION", "submitted_at": months_ago(3), "expected_at": months_ago(1), "actual_at": None, "note": "需补材料，已催办 2 次"},
+    {"plan_id": "P001", "type": "LAND_USE", "submitted_at": months_ago(12), "expected_at": months_ago(11), "actual_at": months_ago(11), "note": ""},
+
+    # P002 三期 LFP 52% — 调试期：5 项已完成，危化品进行中
+    {"plan_id": "P002", "type": "EIA", "submitted_at": months_ago(7), "expected_at": months_ago(6), "actual_at": months_ago(6), "note": ""},
+    {"plan_id": "P002", "type": "SAFETY_PRE", "submitted_at": months_ago(7), "expected_at": months_ago(5), "actual_at": months_ago(5), "note": ""},
+    {"plan_id": "P002", "type": "EMISSION_PERMIT", "submitted_at": months_ago(5), "expected_at": months_ago(4), "actual_at": months_ago(4), "note": ""},
+    {"plan_id": "P002", "type": "ENERGY_REVIEW", "submitted_at": months_ago(8), "expected_at": months_ago(7), "actual_at": months_ago(7), "note": ""},
+    {"plan_id": "P002", "type": "HAZMAT_PRODUCTION", "submitted_at": months_ago(1), "expected_at": months_ahead(1), "actual_at": None, "note": "现场核查阶段"},
+    {"plan_id": "P002", "type": "LAND_USE", "submitted_at": months_ago(9), "expected_at": months_ago(8), "actual_at": months_ago(8), "note": ""},
+
+    # P003 高镍三元技改 35% — 设备采购期：4 项已完成，排污进行中，危化品已逾期
+    {"plan_id": "P003", "type": "EIA", "submitted_at": months_ago(6), "expected_at": months_ago(5), "actual_at": months_ago(5), "note": ""},
+    {"plan_id": "P003", "type": "SAFETY_PRE", "submitted_at": months_ago(6), "expected_at": months_ago(4), "actual_at": months_ago(4), "note": ""},
+    {"plan_id": "P003", "type": "EMISSION_PERMIT", "submitted_at": months_ago(1), "expected_at": months_ahead(2), "actual_at": None, "note": "补充监测数据中"},
+    {"plan_id": "P003", "type": "ENERGY_REVIEW", "submitted_at": months_ago(7), "expected_at": months_ago(6), "actual_at": months_ago(6), "note": ""},
+    {"plan_id": "P003", "type": "HAZMAT_PRODUCTION", "submitted_at": months_ago(2), "expected_at": days_ago(5), "actual_at": None, "note": "原计划上周批复，已逾期"},
+    {"plan_id": "P003", "type": "LAND_USE", "submitted_at": months_ago(8), "expected_at": months_ago(7), "actual_at": months_ago(7), "note": ""},
+
+    # P004 云南石墨化 72% — 投产期：全部 6 项已完成
+    {"plan_id": "P004", "type": "EIA", "submitted_at": months_ago(13), "expected_at": months_ago(12), "actual_at": months_ago(12), "note": ""},
+    {"plan_id": "P004", "type": "SAFETY_PRE", "submitted_at": months_ago(12), "expected_at": months_ago(11), "actual_at": months_ago(11), "note": ""},
+    {"plan_id": "P004", "type": "EMISSION_PERMIT", "submitted_at": months_ago(11), "expected_at": months_ago(10), "actual_at": months_ago(10), "note": ""},
+    {"plan_id": "P004", "type": "ENERGY_REVIEW", "submitted_at": months_ago(14), "expected_at": months_ago(13), "actual_at": months_ago(13), "note": ""},
+    {"plan_id": "P004", "type": "HAZMAT_PRODUCTION", "submitted_at": months_ago(11), "expected_at": months_ago(9), "actual_at": months_ago(9), "note": ""},
+    {"plan_id": "P004", "type": "LAND_USE", "submitted_at": months_ago(15), "expected_at": months_ago(14), "actual_at": months_ago(14), "note": ""},
+
+    # P005 6F 电解液 45% — 设备采购期（刚启动）：仅环评进行中，其余 5 项未开始
+    {"plan_id": "P005", "type": "EIA", "submitted_at": months_ago(1), "expected_at": months_ahead(3), "actual_at": None, "note": "编制报告阶段"},
+    {"plan_id": "P005", "type": "SAFETY_PRE", "submitted_at": None, "expected_at": months_ahead(5), "actual_at": None, "note": "环评批复后启动"},
+    {"plan_id": "P005", "type": "EMISSION_PERMIT", "submitted_at": None, "expected_at": months_ahead(7), "actual_at": None, "note": ""},
+    {"plan_id": "P005", "type": "ENERGY_REVIEW", "submitted_at": None, "expected_at": months_ahead(4), "actual_at": None, "note": "能耗指标待评审"},
+    {"plan_id": "P005", "type": "HAZMAT_PRODUCTION", "submitted_at": None, "expected_at": months_ahead(9), "actual_at": None, "note": ""},
+    {"plan_id": "P005", "type": "LAND_USE", "submitted_at": None, "expected_at": months_ahead(2), "actual_at": None, "note": ""},
+]
+
+
+COMMISSIONINGS = [
+    # P001 二期碳酸锂 38% 安装期 — 1 项已合格，1 项进行中，4 项待开始
+    {"plan_id": "P001", "type": "SINGLE_TRIAL", "target_value": "空载 2h 无异常", "actual_value": "空载 2h 运行正常，轴承温度稳定", "pass_status": "PASS", "verified_at": days_ago(28), "note": "主机+辅机共 6 台"},
+    {"plan_id": "P001", "type": "INTEGRATED_TRIAL", "target_value": "联动 8h 无异常", "actual_value": "联动至 5h 因 DCS 通讯抖动停机", "pass_status": "IN_PROGRESS", "verified_at": None, "note": "计划本月再启一轮"},
+    {"plan_id": "P001", "type": "FEED_TRIAL", "target_value": "产出合格品", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+    {"plan_id": "P001", "type": "LOAD_TEST_72H", "target_value": "72h ≥ 90% 产能", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+    {"plan_id": "P001", "type": "PRODUCT_QUALITY", "target_value": "全部指标符合规格", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+    {"plan_id": "P001", "type": "OEE_VERIFICATION", "target_value": "OEE ≥ 75%", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+
+    # P002 三期 LFP 52% 调试期 — 3 项已合格，2 项进行中，1 项待开始
+    {"plan_id": "P002", "type": "SINGLE_TRIAL", "target_value": "空载 2h 无异常", "actual_value": "2h 运行正常，振动 < 4.5mm/s", "pass_status": "PASS", "verified_at": days_ago(45), "note": ""},
+    {"plan_id": "P002", "type": "INTEGRATED_TRIAL", "target_value": "联动 8h 无异常", "actual_value": "8h 联动通过", "pass_status": "PASS", "verified_at": days_ago(30), "note": ""},
+    {"plan_id": "P002", "type": "FEED_TRIAL", "target_value": "产出合格品", "actual_value": "首批料合格，D50 1.2μm", "pass_status": "PASS", "verified_at": days_ago(18), "note": ""},
+    {"plan_id": "P002", "type": "LOAD_TEST_72H", "target_value": "72h ≥ 90% 产能", "actual_value": "已运行 36h，达到 92% 产能", "pass_status": "IN_PROGRESS", "verified_at": None, "note": "持续监控中"},
+    {"plan_id": "P002", "type": "PRODUCT_QUALITY", "target_value": "全部指标符合规格", "actual_value": "3 批次送检，水分 0.18%（规格 ≤0.10%），磁物 12ppm（规格 ≤5ppm）", "pass_status": "FAIL", "verified_at": days_ago(8), "note": "需供应商更换干燥工序并复测"},
+    {"plan_id": "P002", "type": "OEE_VERIFICATION", "target_value": "OEE ≥ 75%", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": "需 72h 考核完成后测算"},
+
+    # P003 高镍三元技改 35% 设备采购期 — 0 项合格，2 项进行中，4 项待开始
+    {"plan_id": "P003", "type": "SINGLE_TRIAL", "target_value": "空载 2h 无异常", "actual_value": "1#烧结炉调试中", "pass_status": "IN_PROGRESS", "verified_at": None, "note": ""},
+    {"plan_id": "P003", "type": "INTEGRATED_TRIAL", "target_value": "联动 8h 无异常", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+    {"plan_id": "P003", "type": "FEED_TRIAL", "target_value": "产出合格品", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+    {"plan_id": "P003", "type": "LOAD_TEST_72H", "target_value": "72h ≥ 90% 产能", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+    {"plan_id": "P003", "type": "PRODUCT_QUALITY", "target_value": "全部指标符合规格", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+    {"plan_id": "P003", "type": "OEE_VERIFICATION", "target_value": "OEE ≥ 75%", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+
+    # P004 云南石墨化 72% 投产期 — 6 项全部合格
+    {"plan_id": "P004", "type": "SINGLE_TRIAL", "target_value": "空载 2h 无异常", "actual_value": "空载 2h 通过", "pass_status": "PASS", "verified_at": days_ago(150), "note": ""},
+    {"plan_id": "P004", "type": "INTEGRATED_TRIAL", "target_value": "联动 8h 无异常", "actual_value": "8h 联动通过", "pass_status": "PASS", "verified_at": days_ago(140), "note": ""},
+    {"plan_id": "P004", "type": "FEED_TRIAL", "target_value": "产出合格品", "actual_value": "首批料合格", "pass_status": "PASS", "verified_at": days_ago(120), "note": ""},
+    {"plan_id": "P004", "type": "LOAD_TEST_72H", "target_value": "72h ≥ 90% 产能", "actual_value": "72h 达 96% 产能", "pass_status": "PASS", "verified_at": days_ago(90), "note": "超额完成"},
+    {"plan_id": "P004", "type": "PRODUCT_QUALITY", "target_value": "全部指标符合规格", "actual_value": "客户认证通过", "pass_status": "PASS", "verified_at": days_ago(75), "note": "理隆新材认证"},
+    {"plan_id": "P004", "type": "OEE_VERIFICATION", "target_value": "OEE ≥ 75%", "actual_value": "OEE 实测 78.4%", "pass_status": "PASS", "verified_at": days_ago(30), "note": "已稳定达标"},
+
+    # P005 6F 电解液 45% 设备采购期 刚启动 — 全部待开始
+    {"plan_id": "P005", "type": "SINGLE_TRIAL", "target_value": "空载 2h 无异常", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+    {"plan_id": "P005", "type": "INTEGRATED_TRIAL", "target_value": "联动 8h 无异常", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+    {"plan_id": "P005", "type": "FEED_TRIAL", "target_value": "产出合格品", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+    {"plan_id": "P005", "type": "LOAD_TEST_72H", "target_value": "72h ≥ 90% 产能", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+    {"plan_id": "P005", "type": "PRODUCT_QUALITY", "target_value": "全部指标符合规格", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+    {"plan_id": "P005", "type": "OEE_VERIFICATION", "target_value": "OEE ≥ 75%", "actual_value": "", "pass_status": "PENDING", "verified_at": None, "note": ""},
+]
+
+
+RAMPS = [
+    # P001 二期碳酸锂 30k/月 — Phase1 进行中，其余待开始
+    {"plan_id": "P001", "phase": "Phase1", "target_load_rate": 40, "target_capacity": 12000, "planned_period": "第1-2个月", "confirmed_at": days_ago(20), "actual_capacity": 6800, "status": "IN_PROGRESS", "note": "爬坡中，落后 20%"},
+    {"plan_id": "P001", "phase": "Phase2", "target_load_rate": 60, "target_capacity": 18000, "planned_period": "第3-4个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+    {"plan_id": "P001", "phase": "Phase3", "target_load_rate": 80, "target_capacity": 24000, "planned_period": "第5-6个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+    {"plan_id": "P001", "phase": "Phase4", "target_load_rate": 100, "target_capacity": 30000, "planned_period": "第7-8个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+
+    # P002 三期LFP 80k/月 — Phase1 进行中(达成), Phase2 进行中(滞后)
+    {"plan_id": "P002", "phase": "Phase1", "target_load_rate": 40, "target_capacity": 32000, "planned_period": "第1-2个月", "confirmed_at": days_ago(45), "actual_capacity": 33500, "status": "PASS", "note": "略超目标"},
+    {"plan_id": "P002", "phase": "Phase2", "target_load_rate": 60, "target_capacity": 48000, "planned_period": "第3-4个月", "confirmed_at": days_ago(10), "actual_capacity": 41000, "status": "IN_PROGRESS", "note": "已 4 周稳定，需提至 48k"},
+    {"plan_id": "P002", "phase": "Phase3", "target_load_rate": 80, "target_capacity": 64000, "planned_period": "第5-6个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+    {"plan_id": "P002", "phase": "Phase4", "target_load_rate": 100, "target_capacity": 80000, "planned_period": "第7-8个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+
+    # P003 高镍三元 15k/月 — 全部待开始
+    {"plan_id": "P003", "phase": "Phase1", "target_load_rate": 40, "target_capacity": 6000, "planned_period": "第1-2个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+    {"plan_id": "P003", "phase": "Phase2", "target_load_rate": 60, "target_capacity": 9000, "planned_period": "第3-4个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+    {"plan_id": "P003", "phase": "Phase3", "target_load_rate": 80, "target_capacity": 12000, "planned_period": "第5-6个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+    {"plan_id": "P003", "phase": "Phase4", "target_load_rate": 100, "target_capacity": 15000, "planned_period": "第7-8个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+
+    # P004 云南石墨化 50k/月 — Phase1+2 已达标, Phase3 进行中, Phase4 待开始
+    {"plan_id": "P004", "phase": "Phase1", "target_load_rate": 40, "target_capacity": 20000, "planned_period": "第1-2个月", "confirmed_at": days_ago(120), "actual_capacity": 21500, "status": "PASS", "note": ""},
+    {"plan_id": "P004", "phase": "Phase2", "target_load_rate": 60, "target_capacity": 30000, "planned_period": "第3-4个月", "confirmed_at": days_ago(80), "actual_capacity": 31200, "status": "PASS", "note": ""},
+    {"plan_id": "P004", "phase": "Phase3", "target_load_rate": 80, "target_capacity": 40000, "planned_period": "第5-6个月", "confirmed_at": days_ago(15), "actual_capacity": 38500, "status": "IN_PROGRESS", "note": "已稳定 2 周，差 4%"},
+    {"plan_id": "P004", "phase": "Phase4", "target_load_rate": 100, "target_capacity": 50000, "planned_period": "第7-8个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+
+    # P005 6F电解液 20k/月 — 全部待开始
+    {"plan_id": "P005", "phase": "Phase1", "target_load_rate": 40, "target_capacity": 8000, "planned_period": "第1-2个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+    {"plan_id": "P005", "phase": "Phase2", "target_load_rate": 60, "target_capacity": 12000, "planned_period": "第3-4个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+    {"plan_id": "P005", "phase": "Phase3", "target_load_rate": 80, "target_capacity": 16000, "planned_period": "第5-6个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+    {"plan_id": "P005", "phase": "Phase4", "target_load_rate": 100, "target_capacity": 20000, "planned_period": "第7-8个月", "confirmed_at": None, "actual_capacity": None, "status": "PENDING", "note": ""},
+]
+
+
 def seed(db: Session) -> None:
     db.query(TaskUpdate).delete()
     db.query(Attachment).delete()
@@ -453,7 +573,10 @@ def seed(db: Session) -> None:
     db.query(Action).delete()
     db.query(Risk).delete()
     db.query(ExpansionItem).delete()
-    from app.models.expansion import EvidenceChain
+    from app.models.expansion import Approval as ApprovalModel, CommissioningItem, EvidenceChain, RampItem
+    db.query(ApprovalModel).delete()
+    db.query(CommissioningItem).delete()
+    db.query(RampItem).delete()
     db.query(EvidenceChain).delete()
     db.query(ExpansionPlan).delete()
     db.query(Material).delete()
@@ -494,6 +617,15 @@ def seed(db: Session) -> None:
 
     for it in PLAN_ITEMS:
         db.add(ExpansionItem(**it))
+
+    for a in APPROVALS:
+        db.add(Approval(**a))
+
+    for c in COMMISSIONINGS:
+        db.add(CommissioningItem(**c))
+
+    for r in RAMPS:
+        db.add(RampItem(**r))
 
     from app.models.expansion import EvidenceChain
     evidence_rows = [
