@@ -10,6 +10,7 @@
 - [目录结构](#目录结构)
 - [环境要求](#环境要求)
 - [快速启动](#快速启动)
+- [公司环境离线安装](#公司环境离线安装)
 - [默认账号](#默认账号)
 - [常用命令](#常用命令)
 - [模块功能说明](#模块功能说明)
@@ -102,6 +103,66 @@ npm run dev
 - 后端 API：http://localhost:8000
 - API 文档（Swagger）：http://localhost:8000/docs
 - 健康检查：http://localhost:8000/api/health
+
+---
+
+## 公司环境离线安装
+
+> 公司网络下 `npm install` 经常超时（卡在 esbuild / prisma 二进制下载）。
+> 解决思路：把已经在本地下载好的依赖打成压缩包推到 git，公司 clone 后解压 + `npm rebuild` 即可（只下载约 50MB Windows 原生二进制，秒级完成）。
+
+### 一次性维护（在 Mac 上）
+
+当 `package.json` / `package-lock.json` 有变更，或想刷新依赖时：
+
+```bash
+# 1. 重新安装
+npm install
+
+# 2. 重新打包（排除 darwin 原生二进制）
+tar -czf frontend-deps-$(date +%F).tar.gz \
+  --exclude='*darwin-arm64*' \
+  --exclude='node_modules/fsevents' \
+  --exclude='node_modules/.prisma' \
+  --exclude='node_modules/.cache' \
+  node_modules
+
+# 3. 提交
+git add frontend-deps-*.tar.gz setup-windows.bat
+git commit -m "chore: 更新离线依赖压缩包"
+git push
+```
+
+### 公司电脑安装（Windows）
+
+**方式 A：一键脚本（推荐）**
+
+```cmd
+git pull
+setup-windows.bat
+```
+
+脚本会自动：定位压缩包 → 备份旧 `node_modules` → 解压 → `npm rebuild` 拉 Windows 原生二进制 → 清理备份。
+
+**方式 B：手动执行**
+
+```powershell
+# PowerShell（Windows 10 1809+ 自带 tar）
+tar -xzf frontend-deps-2026-07-16.tar.gz
+npm rebuild
+```
+
+### 体积说明
+
+| 文件 | 大小 | 内容 |
+|---|---|---|
+| `frontend-deps-2026-07-16.tar.gz` | ~75MB | 27,624 项跨平台 JS 包（不含 darwin 原生二进制） |
+
+公司 `npm rebuild` 只需下载 esbuild / rolldown / prisma / lightningcss / typescript 的 Windows 版原生包（约 50MB），建议配置镜像加速：
+
+```bash
+npm config set registry https://registry.npmmirror.com
+```
 
 ---
 
