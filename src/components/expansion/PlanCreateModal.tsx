@@ -148,15 +148,16 @@ export function PlanCreateModal({ onClose, onCreated }: Props) {
         <div className="muted">加载中…</div>
       ) : (
         <>
+          <div className="form-row">
+            <label>计划名称 *</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="例如：二期 3 万吨电池级碳酸锂扩产"
+            />
+          </div>
+
           <div className="form-row-2col">
-            <div className="form-row">
-              <label>计划名称 *</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="例如：二期 3 万吨电池级碳酸锂扩产"
-              />
-            </div>
             <div className="form-row">
               <label>物料 *</label>
               <select value={materialId} onChange={(e) => setMaterialId(e.target.value)}>
@@ -166,9 +167,6 @@ export function PlanCreateModal({ onClose, onCreated }: Props) {
                 ))}
               </select>
             </div>
-          </div>
-
-          <div className="form-row-2col">
             <div className="form-row">
               <label>供应商 *</label>
               <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
@@ -177,12 +175,6 @@ export function PlanCreateModal({ onClose, onCreated }: Props) {
                   <option key={s.id} value={s.id}>{s.shortName} · {s.category}</option>
                 ))}
               </select>
-            </div>
-            <div className="form-row">
-              <label className="muted">初始阶段</label>
-              <div className="muted" style={{ paddingTop: 8, fontSize: 12 }}>
-                新建计划统一为「立项」阶段；后续由阀点完成度自动推算（无需手动设置）。
-              </div>
             </div>
           </div>
 

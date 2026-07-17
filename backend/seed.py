@@ -752,6 +752,101 @@ def seed(db: Session) -> None:
             "uploaded_at": days_ago(15),
         })
 
+    # === 补充：供应商上传 + 待采购经理认证，覆盖 4 个 L2 模块 ===
+    # P001 二期碳酸锂 — 供应商（赣锋）补传的安装现场（阀点）
+    p1_install = first_item("P001", "INSTALLATION")
+    if p1_install:
+        node_evidence.append({
+            "plan_id": "P001", "target_kind": "item", "target_id": p1_install.id,
+            "name": "回转窑 2# 安装现场补传", "file_name": "回转窑2号安装补传.jpg",
+            "stored_name": "kiln2-install.jpg", "mime_type": "image/jpeg", "size": 410_000,
+            "url": "/uploads/kiln2-install.jpg",
+            "note": "供应商补传的安装现场照片，原始时间戳保留，需采购复核",
+            "uploaded_by_id": "S_GANFENG", "uploaded_by_role": "SUPPLIER",
+            "requires_verification": True, "verification_status": "PENDING",
+            "uploaded_at": days_ago(1),
+        })
+    # P001 二期碳酸锂 — 供应商上传的排污许可证受理回执（审批）
+    p1_emission = first_approval("P001", "EMISSION_PERMIT")
+    if p1_emission:
+        node_evidence.append({
+            "plan_id": "P001", "target_kind": "approval", "target_id": p1_emission.id,
+            "name": "江苏生态环境局排污许可证受理回执", "file_name": "排污许可证受理回执.pdf",
+            "stored_name": "emission-receipt.pdf", "mime_type": "application/pdf", "size": 280_000,
+            "url": "/uploads/emission-receipt.pdf",
+            "note": "供应商上传的受理回执扫描件，待采购核对原件",
+            "uploaded_by_id": "S_GANFENG", "uploaded_by_role": "SUPPLIER",
+            "requires_verification": True, "verification_status": "PENDING",
+            "uploaded_at": days_ago(2),
+        })
+    # P002 三期 LFP — 供应商上传的能耗实测报告（试车）
+    p2_energy = first_commissioning("P002", "LOAD_TEST_72H")
+    if p2_energy:
+        node_evidence.append({
+            "plan_id": "P002", "target_kind": "commissioning", "target_id": p2_energy.id,
+            "name": "LFP 烘干工段能耗实测报告", "file_name": "LFP烘干能耗实测.pdf",
+            "stored_name": "lfp-energy.pdf", "mime_type": "application/pdf", "size": 460_000,
+            "url": "/uploads/lfp-energy.pdf",
+            "note": "供应商上传的能耗实测原始数据，需采购/质控联合核对",
+            "uploaded_by_id": "S_YUNENG", "uploaded_by_role": "SUPPLIER",
+            "requires_verification": True, "verification_status": "PENDING",
+            "uploaded_at": days_ago(4),
+        })
+    # P003 高镍三元 — 供应商上传的危化品安全评估说明（审批）
+    p3_hazmat = first_approval("P003", "HAZMAT_PRODUCTION")
+    if p3_hazmat:
+        node_evidence.append({
+            "plan_id": "P003", "target_kind": "approval", "target_id": p3_hazmat.id,
+            "name": "高镍三元危化品安全评估说明", "file_name": "危化品安全评估说明.pdf",
+            "stored_name": "hazmat-safety.pdf", "mime_type": "application/pdf", "size": 340_000,
+            "url": "/uploads/hazmat-safety.pdf",
+            "note": "供应商上传的危化品安全评估补充材料，待采购经理确认",
+            "uploaded_by_id": "S_BTR", "uploaded_by_role": "SUPPLIER",
+            "requires_verification": True, "verification_status": "PENDING",
+            "uploaded_at": days_ago(6),
+        })
+    # P004 云南石墨化 — 供应商上传的 Phase2 爬坡达标照片（爬坡）
+    p4_phase2 = first_ramp("P004", "Phase2")
+    if p4_phase2:
+        node_evidence.append({
+            "plan_id": "P004", "target_kind": "ramp", "target_id": p4_phase2.id,
+            "name": "Phase2 爬坡达标现场照片", "file_name": "Phase2爬坡达标.jpg",
+            "stored_name": "phase2-ramp.jpg", "mime_type": "image/jpeg", "size": 380_000,
+            "url": "/uploads/phase2-ramp.jpg",
+            "note": "供应商上传的爬坡达标现场照片，需采购经理现场复核",
+            "uploaded_by_id": "S_SHANSHAN", "uploaded_by_role": "SUPPLIER",
+            "requires_verification": True, "verification_status": "PENDING",
+            "uploaded_at": days_ago(3),
+        })
+    # P005 6F 电解液 — 供应商上传的环评公示截图（审批）
+    p5_eia = first_approval("P005", "EIA")
+    if p5_eia:
+        node_evidence.append({
+            "plan_id": "P005", "target_kind": "approval", "target_id": p5_eia.id,
+            "name": "多氟多 6F 电解液环评公示截图", "file_name": "环评公示截图.png",
+            "stored_name": "eia-publicity.png", "mime_type": "image/png", "size": 220_000,
+            "url": "/uploads/eia-publicity.png",
+            "note": "供应商上传的环评公示网页截图，待采购核对公示期",
+            "uploaded_by_id": "S_DUOFUDUO", "uploaded_by_role": "SUPPLIER",
+            "requires_verification": True, "verification_status": "PENDING",
+            "uploaded_at": days_ago(1),
+        })
+    # P005 6F 电解液 — 供应商上传的试车环境监测 Excel（试车）
+    p5_safety = first_commissioning("P005", "OEE_VERIFICATION")
+    if p5_safety:
+        node_evidence.append({
+            "plan_id": "P005", "target_kind": "commissioning", "target_id": p5_safety.id,
+            "name": "6F 电解液试车环境监测数据", "file_name": "6F试车环境监测.xlsx",
+            "stored_name": "6f-env-monitor.xlsx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "size": 180_000,
+            "url": "/uploads/6f-env-monitor.xlsx",
+            "note": "供应商上传的试车环境监测原始 Excel，待质控核对数据完整性",
+            "uploaded_by_id": "S_DUOFUDUO", "uploaded_by_role": "SUPPLIER",
+            "requires_verification": True, "verification_status": "PENDING",
+            "uploaded_at": days_ago(0),
+        })
+
     print(f"[seed] node_evidence has {len(node_evidence)} rows to insert")
     for row in node_evidence:
         db.add(EvidenceChain(**row))

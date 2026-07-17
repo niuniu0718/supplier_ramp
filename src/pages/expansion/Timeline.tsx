@@ -490,6 +490,7 @@ export function ExpansionTimeline() {
         <EvidencePreviewModal
           evidence={previewEvidence}
           onClose={() => setPreviewEvidence(null)}
+          onVerified={reload}
         />
       )}
       {creatingPlan && (
