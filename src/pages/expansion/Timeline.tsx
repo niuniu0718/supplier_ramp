@@ -14,11 +14,13 @@ import { ApprovalEditModal } from '../../components/expansion/ApprovalEditModal'
 import { CommissioningEditModal } from '../../components/expansion/CommissioningEditModal'
 import { RampEditModal } from '../../components/expansion/RampEditModal'
 import { EvidenceUploadModal } from '../../components/expansion/EvidenceUploadModal'
+import { UpgradeRiskModal } from '../../components/expansion/UpgradeRiskModal'
 import { api } from '../../lib/api'
 import { APPROVAL_CYCLE_BY_KEY, approvalStatusMeta } from '../../lib/approval'
 import { MILESTONE_TEMPLATE, milestoneStatusMeta } from '../../lib/milestone'
 import { COMMISSIONING_TYPES, commissioningStatusMeta } from '../../lib/commissioning'
 import { RAMP_PHASES, rampStatusMeta } from '../../lib/ramp'
+import { LEVEL_LABEL, LEVEL_TONE, typeBadgeMeta } from '../../lib/risk'
 import type {
   ApprovalRow,
   CommissioningRow,
@@ -26,7 +28,9 @@ import type {
   ExpansionMilestoneItem,
   ExpansionTimelinePayload,
   ExpansionTimelineRow,
+  PendingRiskSignal,
   RampRow,
+  RiskSourceKind,
 } from '../../types'
 
 const VIEWS = [
@@ -73,6 +77,9 @@ type EvidenceTarget =
   | { kind: 'commissioning'; planId: string; planName: string; targetId: number; targetLabel: string }
   | { kind: 'ramp'; planId: string; planName: string; targetId: number; targetLabel: string }
 
+type UpgradeTarget =
+  | { planId: string; planName: string; materialId: string; sourceKind: RiskSourceKind; sourceId: number; sourceLabel: string; signal: PendingRiskSignal }
+
 export function ExpansionTimeline() {
   const [data, setData] = useState<ExpansionTimelinePayload | null>(null)
   const [error, setError] = useState('')
@@ -87,6 +94,9 @@ export function ExpansionTimeline() {
   const [editingCommissioning, setEditingCommissioning] = useState<CommissioningRow | null>(null)
   const [editingRamp, setEditingRamp] = useState<RampRow | null>(null)
   const [previewEvidence, setPreviewEvidence] = useState<EvidenceAttachment | null>(null)
+  const [upgrading, setUpgrading] = useState<UpgradeTarget | null>(null)
+  const [upgradeToast, setUpgradeToast] = useState<string | null>(null)
+  const [upgradedSignals, setUpgradedSignals] = useState<Set<string>>(new Set())
 
   function reload() {
     return api.get<ExpansionTimelinePayload>('/api/boards/expansion/views/timeline').then(setData)
@@ -105,6 +115,31 @@ export function ExpansionTimeline() {
     } finally {
       setDeleting(false)
     }
+  }
+
+  function signalKey(planId: string, kind: RiskSourceKind, sourceId: number) {
+    return `${planId}::${kind}::${sourceId}`
+  }
+
+  function startUpgrade(row: ExpansionTimelineRow, kind: RiskSourceKind, sourceId: number, sourceLabel: string, signal: PendingRiskSignal) {
+    if (!row.materialId) return
+    setUpgrading({
+      planId: row.id,
+      planName: row.name,
+      materialId: row.materialId,
+      sourceKind: kind,
+      sourceId,
+      sourceLabel,
+      signal,
+    })
+  }
+
+  function onRiskCreated() {
+    if (!upgrading) return
+    const key = signalKey(upgrading.planId, upgrading.sourceKind, upgrading.sourceId)
+    setUpgradedSignals((prev) => new Set(prev).add(key))
+    setUpgradeToast(`已升级为风险：${upgrading.sourceLabel}`)
+    setTimeout(() => setUpgradeToast(null), 2400)
   }
 
   useEffect(() => {
@@ -373,6 +408,7 @@ export function ExpansionTimeline() {
                 {MILESTONE_TEMPLATE.map((tmpl, idx) => {
                   const item = row.items.find((it) => it.milestoneKey === tmpl.key)
                   const itemLabel = item ? `阀点 ${idx + 1} · ${tmpl.name}` : `阀点 ${idx + 1} · ${tmpl.name}`
+                  const upgraded = item ? upgradedSignals.has(signalKey(row.id, 'item', item.id)) : false
                   return (
                     <MilestoneCard
                       key={tmpl.key}
@@ -389,6 +425,10 @@ export function ExpansionTimeline() {
                         targetId: item.id,
                         targetLabel: `阀点 ${idx + 1} · ${tmpl.name}`,
                       }) : undefined}
+                      onUpgrade={item?.pendingRiskSignal && !upgraded
+                        ? () => startUpgrade(row, 'item', item.id, itemLabel, item.pendingRiskSignal!)
+                        : undefined}
+                      upgraded={upgraded}
                     />
                   )
                 })}
@@ -406,6 +446,10 @@ export function ExpansionTimeline() {
                   targetLabel: label,
                 })}
                 onPreviewEvidence={setPreviewEvidence}
+                onUpgrade={(a, label) => a.pendingRiskSignal
+                  ? startUpgrade(row, 'approval', a.id, label, a.pendingRiskSignal)
+                  : undefined}
+                upgradedKeys={row.approvals.map((a) => upgradedSignals.has(signalKey(row.id, 'approval', a.id)))}
               />
             </section>
             <section className="timeline-plan-section">
@@ -420,6 +464,10 @@ export function ExpansionTimeline() {
                   targetLabel: label,
                 })}
                 onPreviewEvidence={setPreviewEvidence}
+                onUpgrade={(c, label) => c.pendingRiskSignal
+                  ? startUpgrade(row, 'commissioning', c.id, label, c.pendingRiskSignal)
+                  : undefined}
+                upgradedKeys={row.commissionings.map((c) => upgradedSignals.has(signalKey(row.id, 'commissioning', c.id)))}
               />
             </section>
             <section className="timeline-plan-section">
@@ -434,6 +482,10 @@ export function ExpansionTimeline() {
                   targetLabel: label,
                 })}
                 onPreviewEvidence={setPreviewEvidence}
+                onUpgrade={(r, label) => r.pendingRiskSignal
+                  ? startUpgrade(row, 'ramp', r.id, label, r.pendingRiskSignal)
+                  : undefined}
+                upgradedKeys={row.ramps.map((r) => upgradedSignals.has(signalKey(row.id, 'ramp', r.id)))}
               />
             </section>
           </div>
@@ -532,6 +584,25 @@ export function ExpansionTimeline() {
           </ul>
         </Modal>
       )}
+      {upgrading && (
+        <UpgradeRiskModal
+          planId={upgrading.planId}
+          planName={upgrading.planName}
+          materialId={upgrading.materialId}
+          sourceKind={upgrading.sourceKind}
+          sourceId={upgrading.sourceId}
+          sourceLabel={upgrading.sourceLabel}
+          signal={upgrading.signal}
+          onClose={() => setUpgrading(null)}
+          onCreated={onRiskCreated}
+        />
+      )}
+      {upgradeToast && (
+        <div className="upgrade-toast" role="status" aria-live="polite">
+          <AlertTriangle size={13} />
+          <span>{upgradeToast}</span>
+        </div>
+      )}
     </BoardShell>
   )
 }
@@ -554,9 +625,11 @@ interface MilestoneCardProps {
   itemLabel?: string
   onEdit?: () => void
   onUploadEvidence?: () => void
+  onUpgrade?: () => void
+  upgraded?: boolean
 }
 
-function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUploadEvidence }: MilestoneCardProps) {
+function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUploadEvidence, onUpgrade, upgraded }: MilestoneCardProps) {
   const meta = item ? milestoneStatusMeta(item.status) : milestoneStatusMeta('未开始')
   const Icon = TemplateIcon
   const overdue = item?.overdue ?? false
@@ -632,6 +705,16 @@ function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUplo
             </div>
           )}
           <div style={{ flex: 1 }} />
+          {onUpgrade && !upgraded && (
+            <button type="button" className="row-edit-btn upgrade-btn" onClick={onUpgrade} title="将该节点信号升级为风险记录">
+              <AlertTriangle size={11} /> 升级风险
+            </button>
+          )}
+          {upgraded && (
+            <span className="upgraded-tag" title="已升级为风险记录">
+              <AlertTriangle size={11} /> 已升级
+            </span>
+          )}
           {onEdit && (
             <button type="button" className="row-edit-btn" onClick={onEdit}>
               <Pencil size={11} /> 编辑
@@ -648,11 +731,13 @@ function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUplo
   )
 }
 
-function ApprovalSection({ approvals, onEdit, onUploadEvidence, onPreviewEvidence }: {
+function ApprovalSection({ approvals, onEdit, onUploadEvidence, onPreviewEvidence, onUpgrade, upgradedKeys }: {
   approvals: ApprovalRow[]
   onEdit: (row: ApprovalRow) => void
   onUploadEvidence: (row: ApprovalRow, label: string) => void
   onPreviewEvidence: (e: EvidenceAttachment) => void
+  onUpgrade: (row: ApprovalRow, label: string) => void
+  upgradedKeys: boolean[]
 }) {
   if (!approvals.length) return null
   return (
@@ -676,12 +761,19 @@ function ApprovalSection({ approvals, onEdit, onUploadEvidence, onPreviewEvidenc
           </tr>
         </thead>
         <tbody>
-          {approvals.map((a) => {
+          {approvals.map((a, idx) => {
             const meta = approvalStatusMeta(a.status)
+            const label = `审批 ${a.order} · ${a.name}`
             return (
               <tr key={a.type} className={a.overdue ? 'is-overdue' : ''}>
                 <td className="approval-item" data-cycle={APPROVAL_CYCLE_BY_KEY[a.type] ?? ''}>
                   <strong>{a.order}. {a.name}</strong>
+                  {a.pendingRiskSignal && (
+                    <div className="row-risk-signal">
+                      <span className={`risk-signal-dot tone-${LEVEL_TONE[a.pendingRiskSignal.level]}`} />
+                      <span className="muted">{a.pendingRiskSignal.reason}</span>
+                    </div>
+                  )}
                 </td>
                 <td>{a.agency}</td>
                 <td className="date">{fmtYM(a.submittedAt)}</td>
@@ -700,12 +792,22 @@ function ApprovalSection({ approvals, onEdit, onUploadEvidence, onPreviewEvidenc
                   <EvidenceChipList evidence={a.evidence} onPreview={onPreviewEvidence} />
                 </td>
                 <td>
-                  <button type="button" className="row-edit-btn" onClick={() => onEdit(a)}>
-                    <Pencil size={11} /> 编辑
-                  </button>
-                  <button type="button" className="row-edit-btn" onClick={() => onUploadEvidence(a, `审批 ${a.order} · ${a.name}`)}>
-                    <Upload size={11} /> +佐证
-                  </button>
+                  <div className="row-action-stack">
+                    {a.pendingRiskSignal && !upgradedKeys[idx] && (
+                      <button type="button" className="row-edit-btn upgrade-btn" onClick={() => onUpgrade(a, label)}>
+                        <AlertTriangle size={11} /> 升级风险
+                      </button>
+                    )}
+                    {upgradedKeys[idx] && (
+                      <span className="upgraded-tag"><AlertTriangle size={11} /> 已升级</span>
+                    )}
+                    <button type="button" className="row-edit-btn" onClick={() => onEdit(a)}>
+                      <Pencil size={11} /> 编辑
+                    </button>
+                    <button type="button" className="row-edit-btn" onClick={() => onUploadEvidence(a, label)}>
+                      <Upload size={11} /> +佐证
+                    </button>
+                  </div>
                 </td>
               </tr>
             )
@@ -716,11 +818,13 @@ function ApprovalSection({ approvals, onEdit, onUploadEvidence, onPreviewEvidenc
   )
 }
 
-function CommissioningSection({ commissionings, onEdit, onUploadEvidence, onPreviewEvidence }: {
+function CommissioningSection({ commissionings, onEdit, onUploadEvidence, onPreviewEvidence, onUpgrade, upgradedKeys }: {
   commissionings: CommissioningRow[]
   onEdit: (row: CommissioningRow) => void
   onUploadEvidence: (row: CommissioningRow, label: string) => void
   onPreviewEvidence: (e: EvidenceAttachment) => void
+  onUpgrade: (row: CommissioningRow, label: string) => void
+  upgradedKeys: boolean[]
 }) {
   if (!commissionings.length) return null
   return (
@@ -744,13 +848,20 @@ function CommissioningSection({ commissionings, onEdit, onUploadEvidence, onPrev
           </tr>
         </thead>
         <tbody>
-          {COMMISSIONING_TYPES.map((tmpl) => {
+          {COMMISSIONING_TYPES.map((tmpl, idx) => {
             const row = commissionings.find((c) => c.type === tmpl.key)
             const meta = row ? commissioningStatusMeta(row.passStatus) : commissioningStatusMeta('PENDING')
+            const label = `试车 ${tmpl.order} · ${tmpl.name}`
             return (
               <tr key={tmpl.key} className={row?.passStatus === 'FAIL' ? 'is-fail' : ''}>
                 <td>
                   <strong>{tmpl.order}. {tmpl.name}</strong>
+                  {row?.pendingRiskSignal && (
+                    <div className="row-risk-signal">
+                      <span className={`risk-signal-dot tone-${LEVEL_TONE[row.pendingRiskSignal.level]}`} />
+                      <span className="muted">{row.pendingRiskSignal.reason}</span>
+                    </div>
+                  )}
                 </td>
                 <td className="muted">{tmpl.standard}</td>
                 <td>{row?.targetValue || '—'}</td>
@@ -772,14 +883,22 @@ function CommissioningSection({ commissionings, onEdit, onUploadEvidence, onPrev
                 </td>
                 <td>
                   {row && (
-                    <>
+                    <div className="row-action-stack">
+                      {row.pendingRiskSignal && !upgradedKeys[idx] && (
+                        <button type="button" className="row-edit-btn upgrade-btn" onClick={() => onUpgrade(row, label)}>
+                          <AlertTriangle size={11} /> 升级风险
+                        </button>
+                      )}
+                      {upgradedKeys[idx] && (
+                        <span className="upgraded-tag"><AlertTriangle size={11} /> 已升级</span>
+                      )}
                       <button type="button" className="row-edit-btn" onClick={() => onEdit(row)}>
                         <Pencil size={11} /> 编辑
                       </button>
-                      <button type="button" className="row-edit-btn" onClick={() => onUploadEvidence(row, `试车 ${tmpl.order} · ${tmpl.name}`)}>
+                      <button type="button" className="row-edit-btn" onClick={() => onUploadEvidence(row, label)}>
                         <Upload size={11} /> +佐证
                       </button>
-                    </>
+                    </div>
                   )}
                 </td>
               </tr>
@@ -791,11 +910,13 @@ function CommissioningSection({ commissionings, onEdit, onUploadEvidence, onPrev
   )
 }
 
-function RampSection({ ramps, onEdit, onUploadEvidence, onPreviewEvidence }: {
+function RampSection({ ramps, onEdit, onUploadEvidence, onPreviewEvidence, onUpgrade, upgradedKeys }: {
   ramps: RampRow[]
   onEdit: (row: RampRow) => void
   onUploadEvidence: (row: RampRow, label: string) => void
   onPreviewEvidence: (e: EvidenceAttachment) => void
+  onUpgrade: (row: RampRow, label: string) => void
+  upgradedKeys: boolean[]
 }) {
   if (!ramps.length) return null
   return (
@@ -820,17 +941,24 @@ function RampSection({ ramps, onEdit, onUploadEvidence, onPreviewEvidence }: {
           </tr>
         </thead>
         <tbody>
-          {RAMP_PHASES.map((tmpl) => {
+          {RAMP_PHASES.map((tmpl, idx) => {
             const row = ramps.find((r) => r.phase === tmpl.phase)
             const meta = row ? rampStatusMeta(row.status) : rampStatusMeta('PENDING')
             const reached = row?.actualCapacity != null && row.targetCapacity > 0
               ? Math.round((row.actualCapacity / row.targetCapacity) * 100)
               : null
+            const label = `爬坡 · ${tmpl.phase} (${tmpl.loadRate}%)`
             return (
               <tr key={tmpl.phase} className={row?.status === 'FAIL' ? 'is-fail' : ''}>
                 <td>
                   <strong>{tmpl.phase}</strong>
                   <div className="muted" style={{ fontSize: 11 }}>{tmpl.period}</div>
+                  {row?.pendingRiskSignal && (
+                    <div className="row-risk-signal">
+                      <span className={`risk-signal-dot tone-${LEVEL_TONE[row.pendingRiskSignal.level]}`} />
+                      <span className="muted">{row.pendingRiskSignal.reason}</span>
+                    </div>
+                  )}
                 </td>
                 <td className="number">{tmpl.loadRate}%</td>
                 <td className="number">{(row?.targetCapacity ?? tmpl.loadRate * 1000).toLocaleString()}</td>
@@ -862,14 +990,22 @@ function RampSection({ ramps, onEdit, onUploadEvidence, onPreviewEvidence }: {
                 </td>
                 <td>
                   {row && (
-                    <>
+                    <div className="row-action-stack">
+                      {row.pendingRiskSignal && !upgradedKeys[idx] && (
+                        <button type="button" className="row-edit-btn upgrade-btn" onClick={() => onUpgrade(row, label)}>
+                          <AlertTriangle size={11} /> 升级风险
+                        </button>
+                      )}
+                      {upgradedKeys[idx] && (
+                        <span className="upgraded-tag"><AlertTriangle size={11} /> 已升级</span>
+                      )}
                       <button type="button" className="row-edit-btn" onClick={() => onEdit(row)}>
                         <Pencil size={11} /> 编辑
                       </button>
-                      <button type="button" className="row-edit-btn" onClick={() => onUploadEvidence(row, `爬坡 · ${tmpl.phase} (${tmpl.loadRate}%)`)}>
+                      <button type="button" className="row-edit-btn" onClick={() => onUploadEvidence(row, label)}>
                         <Upload size={11} /> +佐证
                       </button>
-                    </>
+                    </div>
                   )}
                 </td>
               </tr>

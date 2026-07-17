@@ -8,6 +8,11 @@
 
 | 模块 | 变更 |
 |---|---|
+| 风险模型升级（9 类 + 4 档） | `risk` 表新增 `sourceKind / sourceId / sourcePlanId` 反向链接字段；风险类型从 5 类扩展到 9 类（5 物料级 + 4 L2 节点级：审批逾期 / 试车不达标 / 爬坡未达标 / 阀点延期）；后端 `db.py` 加幂等迁移，列不存在自动 ALTER。等级 enum 仍是 4 档（RED/ORANGE/YELLOW/GREEN），UI 只暴露 3 档（ORANGE 与 YELLOW 同显为黄）。 |
+| 风险 CRUD 接口 | 新增 `POST /api/risks`（支持 L2 节点级，带 source 三元组校验）、`GET /api/risks/{id}`、`PATCH /api/risks/{id}`（改 level / status / description / impactScope）；GET 端点统一走 `_resolve_source` 反查源头节点 label + 状态 + 关键日期 |
+| Timeline pendingRiskSignal | timeline 4 个 L2 模块（阀点/审批/试车/爬坡）每个节点都加 `pendingRiskSignal` 字段，按规则自动判级：阀点延期 >7 天 YELLOW / >30 天 ORANGE；审批逾期 >14 天 ORANGE / >30 天 RED；试车 FAIL → RED；爬坡 < 目标 80% → ORANGE |
+| 一键升级风险 | timeline 命中信号的节点行尾出现「升级风险」按钮，点击弹窗预填 type/level/sourceKind/sourceId/sourcePlanId，可微调 level + 描述 + 影响范围后提交；成功弹 toast 反馈，节点信号状态本地标记为「已升级」；timeline 接口同时补 `materialId` 供升级弹窗使用 |
+| 风险列表 source 反向链接 | 风险总览 / 升级路径两页加「关联节点」列，L2 风险显示 kind + label + 计划名，点击跳回 timeline 锚点；按类型分布页 description 更新为「9 类风险按类型聚合」 |
 | 扩产计划 CRUD | 时间轴页面支持「新增 / 归档」扩产计划；新建可一键按模板自动生成 8 阀点 + 6 审批 + 6 试车 + 4 爬坡共 24 个子节点；删除改为软删除（打 `archived_at` 时间戳，列表自动过滤，数据不丢） |
 | 编辑计划 · 子节点计划时间 | 新增「子节点计划时间」编辑面板，4 个 L2 模块（阀点 / 审批 / 试车 / 爬坡）共 24 个计划日期可一次性手动微调，底部「保存全部」按钮按 dirty 标记批量 PATCH |
 | 佐证预览内联认证 | 在佐证预览模态框中为「供应商上传 + 待认证」佐证直接提供「通过认证 / 退回供应商」按钮，覆盖全部 4 个 L2 模块，避免来回跳转 |
@@ -323,6 +328,41 @@ L2 模块中所有日期字段都使用统一的 `DatePickerField`（原生 `<in
 - **RampItem**（量产爬坡项）：计划 id、阶段、目标负荷率、目标产能、计划周期、实际确认时间、实际达成产能、达标状态、备注
 - **EvidenceChain**（证据档案）：计划 id、分类、文件名、上传者、上传时间、URL
 - **Risk / Action / FollowTask / TaskUpdate / Attachment**：风险与任务相关
+- **Risk**（风险）：物料 id、类型（9 类）、等级（4 档）、描述、影响范围、状态、创建人；可携带 `sourceKind / sourceId / sourcePlanId` 反向链接到 L2 节点（item / approval / commissioning / ramp 之一），前端列表会自动反查源头节点 label + 计划名展示
+
+### 9 类风险类型
+
+**物料级 5 类**（`sourceKind` 为空，与原有逻辑一致）
+
+| key | 中文 | 触发场景 |
+|---|---|---|
+| `SINGLE_SOURCE` | 单点依赖 | 物料只有 1 家供应商 |
+| `LOW_INVENTORY` | 库存不足 | 库存低于安全线 |
+| `PRICE` | 价格异常 | 价格大幅波动 |
+| `POLICY` | 政策风险 | 政策/法规变化 |
+| `QUALITY` | 质量风险 | 质量不达标 |
+
+**L2 节点级 4 类**（必须给 `sourceKind` + `sourceId`，后端会校验节点存在）
+
+| key | 中文 | 命中条件（由 timeline 自动判） |
+|---|---|---|
+| `APPROVAL_OVERDUE` | 审批逾期 | 审批 `expectedAt` 逾期 >14 天 |
+| `COMMISSIONING_FAIL` | 试车不达标 | 试车 `passStatus == FAIL` |
+| `RAMP_BELOW_TARGET` | 爬坡未达标 | 实际产能 < 目标 × 80% 或状态 FAIL |
+| `MILESTONE_DELAYED` | 阀点延期 | 实际到货晚于计划 >7 天 |
+
+### 风险等级
+
+后端 enum 4 档：`RED / ORANGE / YELLOW / GREEN`。**UI 暴露 3 档**（ORANGE 与 YELLOW 合并显示为黄）：
+
+| 后端 level | UI 显示 | tone | 判级规则（自动） |
+|---|---|---|---|
+| `RED` | 红 | red | 试车 FAIL · 审批逾期 >30 天 · 关闭前最高告警 |
+| `ORANGE` | 黄 | yellow | 阀点延期 >30 天 · 审批逾期 14-30 天 · 爬坡 < 目标 80% |
+| `YELLOW` | 黄 | yellow | 阀点延期 7-30 天 |
+| `GREEN` | 绿 | green | 已闭环 / 稳定 |
+
+后端不存「为什么是这个 level」——只存字符串本身；判定逻辑每次从节点当前状态重算，状态变 level 自动跟上。手工改用 `PATCH /api/risks/{id} body: { level: "RED" }`。
 
 ### 6 项标准审批事项
 
@@ -348,6 +388,7 @@ L2 模块中所有日期字段都使用统一的 `DatePickerField`（原生 `<in
 | 扩产 CRUD | `GET /api/expansion-plans`、`POST /api/expansion-plans`（可一并生成 4 个 L2 模块子节点）、`DELETE /api/expansion-plans/{id}`（软删除，打 `archived_at`）、`GET /api/expansion-meta`（供前端表单使用） |
 | 扩产编辑 | `PATCH /api/expansion-plans/{id}`、`PATCH /api/expansion-items/{id}`、`PATCH /api/approvals/{id}`、`PATCH /api/commissionings/{id}`、`PATCH /api/ramps/{id}`、`POST /api/evidence` |
 | 风险 | `GET /api/boards/risks/views/{overview\|by-type\|escalation\|closure}` |
+| 风险 CRUD | `POST /api/risks`（L2 节点级须带 `sourceKind`/`sourceId`/`sourcePlanId`）、`GET /api/risks/{id}`、`PATCH /api/risks/{id}`（改 `level`/`status`/`description`/`impactScope`，关闭时自动写 `closedAt`） |
 | 任务 | `GET /api/boards/tasks/views/{my-todo\|overdue\|escalation\|closure}` |
 | 通知 | `/api/notifications/*` |
 

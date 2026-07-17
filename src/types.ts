@@ -1,5 +1,44 @@
 export type RiskLevel = 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED'
 
+// === 9 类风险类型（与后端 backend/app/api/risks.py TYPE_LABELS 一致）===
+export type RiskTypeKey =
+  // 物料级 5 类
+  | 'SINGLE_SOURCE'
+  | 'LOW_INVENTORY'
+  | 'PRICE'
+  | 'POLICY'
+  | 'QUALITY'
+  // L2 节点级 4 类
+  | 'APPROVAL_OVERDUE'
+  | 'COMMISSIONING_FAIL'
+  | 'RAMP_BELOW_TARGET'
+  | 'MILESTONE_DELAYED'
+
+export type RiskSourceKind = 'item' | 'approval' | 'commissioning' | 'ramp'
+
+export interface RiskSource {
+  kind: RiskSourceKind | null
+  id: number | null
+  planId: string
+  planName: string
+  label: string
+  status?: string
+  expectedArrival?: string | null
+  actualArrival?: string | null
+  submittedAt?: string | null
+  expectedAt?: string | null
+  actualAt?: string | null
+  verifiedAt?: string | null
+  confirmedAt?: string | null
+}
+
+export interface PendingRiskSignal {
+  type: RiskTypeKey
+  level: RiskLevel
+  delayDays: number
+  reason: string
+}
+
 export type Role = 'PROCUREMENT_MANAGER' | 'PROCUREMENT_ENGINEER' | 'DEPARTMENT_LEADER' | 'SUPPLIER'
 
 export interface UserSummary {
@@ -84,6 +123,7 @@ export interface ExpansionMilestoneItem {
   milestoneOrder: number
   milestoneName: string
   evidence: EvidenceAttachment[]
+  pendingRiskSignal: PendingRiskSignal | null
 }
 
 export interface ExpansionTimelineRow {
@@ -91,6 +131,7 @@ export interface ExpansionTimelineRow {
   name: string
   supplierName: string
   materialName: string
+  materialId?: string
   startDate: string
   endDate: string
   stage: string
@@ -124,6 +165,7 @@ export interface ApprovalRow {
   overdue: boolean
   note: string
   evidence: EvidenceAttachment[]
+  pendingRiskSignal: PendingRiskSignal | null
 }
 
 export interface CommissioningRow {
@@ -139,6 +181,7 @@ export interface CommissioningRow {
   verifiedAt: string | null
   note: string
   evidence: EvidenceAttachment[]
+  pendingRiskSignal: PendingRiskSignal | null
 }
 
 export interface RampRow {
@@ -154,6 +197,7 @@ export interface RampRow {
   statusLabel: string
   note: string
   evidence: EvidenceAttachment[]
+  pendingRiskSignal: PendingRiskSignal | null
 }
 
 export interface ExpansionTimelinePayload {
@@ -210,7 +254,8 @@ export interface ExpansionEvidencePayload {
 
 export interface RiskRow {
   id: string
-  type: string
+  type: RiskTypeKey | string
+  typeLabel: string
   level: RiskLevel
   status: string
   description: string
@@ -220,6 +265,11 @@ export interface RiskRow {
   actionCount: number
   openActionCount: number
   discoveredAt: string
+  closedAt: string | null
+  sourceKind: RiskSourceKind | null
+  sourceId: number | null
+  sourcePlanId: string | null
+  source: RiskSource | null
 }
 
 export interface RisksOverviewPayload {

@@ -31,7 +31,7 @@ export function RisksByType() {
       boardId="risks"
       boardLabel="风险预警"
       title="风险按类型分布"
-      description="5 类风险的单点依赖 / 库存 / 价格 / 政策 / 质量"
+      description="9 类风险按类型聚合 · 物料级 5 类 + L2 节点级 4 类"
       views={VIEWS}
       kpis={data.kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
     >

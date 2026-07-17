@@ -4,6 +4,7 @@ import { KpiCard } from '../../components/ui/KpiCard'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { ErrorState, LoadingState } from '../../components/ui/States'
 import { api } from '../../lib/api'
+import { typeBadgeMeta } from '../../lib/risk'
 import type { RisksEscalationPayload } from '../../types'
 
 const VIEWS = [
@@ -32,20 +33,29 @@ export function RisksEscalation() {
         <h3>{title}</h3>
         <StatusBadge status={tone} short />
       </header>
-      {list.length === 0 ? <p className="muted">无</p> : list.map((r) => (
-        <article key={r.id} className="plan-card" style={{ padding: 10 }}>
-          <div className="plan-card-head">
-            <div><strong>{r.id}</strong><small style={{ display: 'block' }}>{r.materialName} · {r.supplierName}</small></div>
-            <StatusBadge status={r.level} short />
-          </div>
-          <small>{r.description}</small>
-          <div className="evidence-meta">
-            {r.actions.map((a) => (
-              <span key={a.id} className="evidence-tag">{a.type} · {a.taskProgress ?? 0}%</span>
-            ))}
-          </div>
-        </article>
-      ))}
+      {list.length === 0 ? <p className="muted">无</p> : list.map((r) => {
+        const typeMeta = typeBadgeMeta(r.type)
+        return (
+          <article key={r.id} className="plan-card" style={{ padding: 10 }}>
+            <div className="plan-card-head">
+              <div>
+                <strong>{r.id}</strong>
+                <small style={{ display: 'block' }}>{r.materialName} · {r.supplierName}</small>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                <span className={`milestone-pill tone-${typeMeta.tone}`}>{typeMeta.label}</span>
+                <StatusBadge status={r.level} short />
+              </div>
+            </div>
+            <small>{r.description}</small>
+            <div className="evidence-meta">
+              {r.actions.map((a) => (
+                <span key={a.id} className="evidence-tag">{a.type} · {a.taskProgress ?? 0}%</span>
+              ))}
+            </div>
+          </article>
+        )
+      })}
     </section>
   )
 
@@ -54,7 +64,7 @@ export function RisksEscalation() {
       boardId="risks"
       boardLabel="风险预警"
       title="风险升级路径"
-      description="红色待升级 / 橙黄跟进中 / 已闭环 的全路径时间分布"
+      description="红色待升级 / 橙黄跟进中 / 已闭环 的全路径时间分布 · 9 类风险含 L2 节点级 4 类"
       views={VIEWS}
       kpis={data.kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
     >

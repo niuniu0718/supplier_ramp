@@ -1700,3 +1700,154 @@ a { color: inherit; }
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
+
+/* === L2 节点升级风险按钮 + 信号提示 === */
+.row-action-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+.row-action-stack .row-edit-btn { justify-content: flex-start; }
+
+.row-risk-signal {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.risk-signal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.risk-signal-dot.tone-red { background: var(--red); }
+.risk-signal-dot.tone-orange { background: var(--orange); }
+.risk-signal-dot.tone-yellow { background: #f5b50a; }
+.risk-signal-dot.tone-green { background: var(--green); }
+
+.upgrade-btn {
+  background: #fff4ed;
+  color: var(--orange);
+  border: 1px solid #ffd6b3;
+}
+.upgrade-btn:hover {
+  background: #ffe5d2;
+  color: #c04300;
+}
+.upgraded-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--green);
+  background: #e6f8f1;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.upgrade-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 9999;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+  animation: upgrade-toast-in 0.2s ease;
+}
+@keyframes upgrade-toast-in {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.upgrade-signal-card {
+  background: #fff8f0;
+  border: 1px solid #ffe1c2;
+  border-radius: 6px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.upgrade-signal-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.upgrade-signal-row > .muted:first-child {
+  min-width: 72px;
+}
+
+.level-radio-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.level-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background: #fff;
+  font-size: 13px;
+}
+.level-radio.tone-red input:checked + span { color: var(--red); font-weight: 600; }
+.level-radio.tone-yellow input:checked + span { color: var(--orange); font-weight: 600; }
+.level-radio.tone-green input:checked + span { color: var(--green); font-weight: 600; }
+.level-radio input { margin: 0; }
+.level-radio.tone-red { border-color: #f3c0bb; }
+.level-radio.tone-yellow { border-color: #f5d7a3; }
+.level-radio.tone-green { border-color: #b7e3d1; }
+.level-radio:has(input:checked) {
+  background: #f8fbff;
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+/* === 风险列表 source 反向链接 === */
+.risk-source-link {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #f3f7ff;
+  border: 1px solid #d6e4ff;
+  color: var(--text-main);
+  text-decoration: none;
+  font-size: 12px;
+  line-height: 1.3;
+  max-width: 220px;
+}
+.risk-source-link:hover {
+  background: #e8f0ff;
+  border-color: var(--primary);
+}
+.risk-source-link strong { font-weight: 600; }
+.risk-source-link small { font-size: 10px; }
+.risk-source-kind {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  align-self: flex-start;
+  margin-bottom: 2px;
+}

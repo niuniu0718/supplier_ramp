@@ -333,6 +333,7 @@ def expansion_timeline(
             "name": p.name,
             "supplierName": p.supplier.short_name if p.supplier else "",
             "materialName": p.material.name if p.material else "",
+            "materialId": p.material_id,
             "startDate": p.start_date.isoformat(),
             "endDate": p.end_date.isoformat(),
             "stage": p.stage,
