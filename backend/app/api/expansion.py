@@ -176,6 +176,7 @@ def list_plans(
 ):
     plans = (
         db.query(ExpansionPlan)
+        .filter(ExpansionPlan.archived_at.is_(None))
         .options(selectinload(ExpansionPlan.material), selectinload(ExpansionPlan.supplier),
                 selectinload(ExpansionPlan.items), selectinload(ExpansionPlan.evidence))
         .order_by(ExpansionPlan.start_date.asc())
@@ -191,6 +192,7 @@ def expansion_overview(
 ):
     plans = (
         db.query(ExpansionPlan)
+        .filter(ExpansionPlan.archived_at.is_(None))
         .options(selectinload(ExpansionPlan.supplier), selectinload(ExpansionPlan.material),
                 selectinload(ExpansionPlan.items), selectinload(ExpansionPlan.evidence))
         .order_by(ExpansionPlan.updated_at.desc())
@@ -226,6 +228,7 @@ def expansion_timeline(
 ):
     plans = (
         db.query(ExpansionPlan)
+        .filter(ExpansionPlan.archived_at.is_(None))
         .options(selectinload(ExpansionPlan.supplier), selectinload(ExpansionPlan.material),
                 selectinload(ExpansionPlan.items), selectinload(ExpansionPlan.approvals),
                 selectinload(ExpansionPlan.commissionings), selectinload(ExpansionPlan.ramps))
@@ -303,6 +306,10 @@ def expansion_timeline(
     invested = sum(p.invested_capex for p in plans) / 10000
     total_capex = sum(p.total_capex for p in plans) / 10000
     months_span = max(1, int((max_end - min_start) / (30 * 86_400_000)))
+    # 最远结束时间：算出季度（按月分），便于一眼看清落在哪一季度
+    latest_dt = datetime.fromtimestamp(max_end / 1000)
+    latest_quarter = (latest_dt.month - 1) // 3 + 1
+    latest_hint = f"{latest_dt.year}年Q{latest_quarter} · {latest_dt.year}/{latest_dt.month:02d}"
     return {
         "board": "expansion",
         "view": "timeline",
@@ -310,7 +317,7 @@ def expansion_timeline(
         "kpis": [
             {"label": "计划数量", "value": len(plans), "unit": "项", "tone": "blue"},
             {"label": "里程碑跨度", "value": str(months_span), "unit": "个月", "tone": "green",
-             "hint": f"最远至 {datetime.fromtimestamp(max_end/1000).strftime('%Y-Q')[:7]}"},
+             "hint": f"最远至 {latest_hint}"},
             {"label": "已投 CAPEX", "value": f"{invested:.1f}", "unit": "亿元", "tone": "purple"},
             {"label": "总 CAPEX", "value": f"{total_capex:.1f}", "unit": "亿元", "tone": "orange"},
             {"label": "逾期阀点", "value": f"{overdue_total}/{item_total}", "unit": "", "tone": "red" if overdue_total else "green",
@@ -327,6 +334,7 @@ def expansion_evidence(
 ):
     plans = (
         db.query(ExpansionPlan)
+        .filter(ExpansionPlan.archived_at.is_(None))
         .options(
             selectinload(ExpansionPlan.supplier),
             selectinload(ExpansionPlan.items),
@@ -804,7 +812,9 @@ def create_plan(
     invested_capex = float(body.get("investedCapex") or body.get("invested_capex") or 0)
     total_capex = float(body.get("totalCapex") or body.get("total_capex") or 0)
     funding_sources = body.get("fundingSources") or body.get("funding_sources") or []
-    stage = body.get("stage") or "立项"
+    # 新建计划的初始阶段：新创建时统一为「立项」，不再由用户手动指定；
+    # 阶段字段后续可在编辑阀点状态时由后端自动推断
+    stage = "立项"
     status = body.get("status") or None
     risk_types = body.get("riskTypes") or body.get("risk_types") or []
     risk_description = body.get("riskDescription") or body.get("risk_description") or ""
@@ -913,10 +923,15 @@ def delete_plan(
     db: Session = Depends(get_db),
     _: str = Depends(require_session),
 ):
-    """删除扩产计划，子表通过 ondelete=CASCADE 自动级联清理。"""
+    """归档扩产计划（软删除）：保留所有数据，仅打上 archived_at 时间戳。
+    列表类接口会自动过滤已归档计划；数据未真正删除，未来可恢复。"""
     plan = db.get(ExpansionPlan, plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="计划不存在。")
-    db.delete(plan)
+    if plan.archived_at is not None:
+        # 幂等：重复归档也直接返回
+        return {"ok": True, "planId": plan_id, "archivedAt": plan.archived_at.isoformat()}
+    plan.archived_at = datetime.utcnow()
     db.commit()
-    return {"ok": True, "planId": plan_id}
+    db.refresh(plan)
+    return {"ok": True, "planId": plan_id, "archivedAt": plan.archived_at.isoformat()}

@@ -31,7 +31,7 @@ interface ExpansionMeta {
 
 interface Props {
   onClose: () => void
-  onCreated: () => void
+  onCreated: (newPlanId: string) => void
 }
 
 function todayStr() {
@@ -57,7 +57,6 @@ export function PlanCreateModal({ onClose, onCreated }: Props) {
   const [investedCapex, setInvestedCapex] = useState('0')
   const [totalCapex, setTotalCapex] = useState('0')
   const [fundingSources, setFundingSources] = useState('自筹')
-  const [stage, setStage] = useState('立项')
   const [riskDescription, setRiskDescription] = useState('')
 
   const [genItems, setGenItems] = useState(true)
@@ -102,7 +101,7 @@ export function PlanCreateModal({ onClose, onCreated }: Props) {
         .split(/[,，、\s]+/)
         .map((s) => s.trim())
         .filter(Boolean)
-      await api.post('/api/expansion-plans', {
+      const { plan } = await api.post<{ plan: { id: string } }>('/api/expansion-plans', {
         name: name.trim(),
         materialId,
         supplierId,
@@ -112,7 +111,6 @@ export function PlanCreateModal({ onClose, onCreated }: Props) {
         investedCapex: Number(investedCapex) || 0,
         totalCapex: Number(totalCapex) || 0,
         fundingSources: fundingList,
-        stage,
         riskDescription: riskDescription.trim(),
         generate: {
           items: genItems,
@@ -121,8 +119,7 @@ export function PlanCreateModal({ onClose, onCreated }: Props) {
           ramps: genRamps,
         },
       })
-      onCreated()
-      onClose()
+      onCreated(plan.id)
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存失败。')
     } finally {
@@ -139,7 +136,7 @@ export function PlanCreateModal({ onClose, onCreated }: Props) {
         <>
           <button className="button button-secondary" onClick={onClose} disabled={saving}>取消</button>
           <button className="button button-primary" onClick={save} disabled={saving || !meta}>
-            {saving ? '创建中…' : '创建并生成'}
+            {saving ? '创建中…' : '创建并编辑子节点'}
           </button>
         </>
       }
@@ -182,20 +179,10 @@ export function PlanCreateModal({ onClose, onCreated }: Props) {
               </select>
             </div>
             <div className="form-row">
-              <label>当前阶段</label>
-              <select value={stage} onChange={(e) => setStage(e.target.value)}>
-                <option>立项</option>
-                <option>可行性研究</option>
-                <option>环评安评</option>
-                <option>设备采购</option>
-                <option>土建</option>
-                <option>采购设备</option>
-                <option>安装</option>
-                <option>调试</option>
-                <option>试车</option>
-                <option>投产</option>
-                <option>完工</option>
-              </select>
+              <label className="muted">初始阶段</label>
+              <div className="muted" style={{ paddingTop: 8, fontSize: 12 }}>
+                新建计划统一为「立项」阶段；后续由阀点完成度自动推算（无需手动设置）。
+              </div>
             </div>
           </div>
 

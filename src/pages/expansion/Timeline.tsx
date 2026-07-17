@@ -493,7 +493,20 @@ export function ExpansionTimeline() {
         />
       )}
       {creatingPlan && (
-        <PlanCreateModal onClose={() => setCreatingPlan(false)} onCreated={reload} />
+        <PlanCreateModal
+          onClose={() => setCreatingPlan(false)}
+          onCreated={(newPlanId) => {
+            setCreatingPlan(false)
+            // 重新拉取时间轴，拿到包含 children 的完整 plan 行
+            reload().then(() => {
+              // 此时 data 可能还没更新到 state，所以从接口再拉一次最新 rows
+              api.get<ExpansionTimelinePayload>('/api/boards/expansion/views/timeline').then((fresh) => {
+                const found = fresh.rows.find((r) => r.id === newPlanId)
+                if (found) setEditingPlan(found)
+              })
+            })
+          }}
+        />
       )}
       {deletingPlan && (
         <Modal

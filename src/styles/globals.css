@@ -1604,3 +1604,88 @@ a { color: inherit; }
   gap: 10px;
 }
 
+/* PlanEditModal — 子节点计划时间编辑 */
+.plan-edit-children {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+.plan-edit-children-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.plan-edit-children-head strong { font-size: 13px; color: var(--text); }
+.plan-edit-children-head small { font-size: 11px; }
+
+.plan-edit-children-group {
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.plan-edit-children-group summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+.plan-edit-children-group summary::-webkit-details-marker { display: none; }
+.plan-edit-children-group summary::before {
+  content: '▸';
+  display: inline-block;
+  color: var(--text-muted);
+  font-size: 10px;
+  transition: transform 0.15s;
+  width: 10px;
+}
+.plan-edit-children-group[open] > summary::before { transform: rotate(90deg); }
+.plan-edit-children-group summary strong { font-size: 12px; }
+.plan-edit-children-group summary small { font-size: 11px; }
+
+.plan-edit-table {
+  width: 100%;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+}
+.plan-edit-table thead th {
+  background: #f7f9fc;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.plan-edit-table tbody td {
+  padding: 6px 10px;
+  font-size: 12px;
+  vertical-align: middle;
+}
+.plan-edit-table tbody tr.is-dirty td {
+  background: #fff8f0;
+}
+.plan-edit-table tbody tr.is-dirty td:first-child {
+  border-left: 2px solid #f59e0b;
+  padding-left: 8px;
+}
+.plan-edit-note-input {
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  outline: none;
+}
+.plan-edit-note-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+

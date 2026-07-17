@@ -36,6 +36,7 @@ class ExpansionPlan(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    archived_at: Mapped[Optional[datetime]] = mapped_column("archivedAt", DateTime, nullable=True, default=None, index=True)
 
     material: Mapped[Material] = relationship(back_populates="expansion_plans")
     supplier: Mapped[Supplier] = relationship(back_populates="expansion_plans")

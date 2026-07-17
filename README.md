@@ -8,6 +8,9 @@
 
 | 模块 | 变更 |
 |---|---|
+| 扩产计划 CRUD | 时间轴页面支持「新增 / 归档」扩产计划；新建可一键按模板自动生成 8 阀点 + 6 审批 + 6 试车 + 4 爬坡共 24 个子节点；删除改为软删除（打 `archived_at` 时间戳，列表自动过滤，数据不丢） |
+| 编辑计划 · 子节点计划时间 | 新增「子节点计划时间」编辑面板，4 个 L2 模块（阀点 / 审批 / 试车 / 爬坡）共 24 个计划日期可一次性手动微调，底部「保存全部」按钮按 dirty 标记批量 PATCH |
+| 里程碑跨度 KPI | 「里程碑跨度」hint 改为「最远至 YYYY年QX · YYYY/MM」格式（季度 + 月份），原显示停留在「YYYY-Q」半截 |
 | 关键审批事项 | 新增 `approval` 表 + 6 项标准审批（环评/安评/排污/节能/危化品/建设用地），状态由后端按日期推算（已完成/进行中/未开始/已逾期） |
 | 证据再认证 | 上传证据支持「待认证 / 已认证 / 已退回」三态，采购/质控可在线驳回并要求重新上传 |
 | 证据预览 | 关键审批 / 试车验证 / 量产爬坡 / 证据档案四处的佐证 chip 改为可点击，直接内嵌预览图片 / PDF |
@@ -311,7 +314,7 @@ L2 模块中所有日期字段都使用统一的 `DatePickerField`（原生 `<in
 
 - **Supplier**（供应商）：代码、名称、简称、品类、联系方式、所在地、合作年限
 - **Material**（物料）：名称、类型（CATHODE / ANODE / ELECTROLYTE / BINDER / ADDITIVE）、月供需、库存、安全库存月数、是否单点
-- **ExpansionPlan**（扩产计划）：物料、供应商、起止日期、目标产能、已投/总 CAPEX、阶段、进度、状态
+- **ExpansionPlan**（扩产计划）：物料、供应商、起止日期、目标产能、已投/总 CAPEX、阶段、进度、状态、`archived_at`（软删除时间戳，列表默认过滤为 NULL）
 - **ExpansionItem**（阀点）：计划 id、类型、名称、供应商、采购方、状态、计划/实际到货日期、所属里程碑 key/order
 - **Approval**（审批）：计划 id、审批类型 key、提交/预计批复/实际批复日期、备注；状态由后端按日期推算（已完成 / 进行中 / 未开始 / 已逾期）
 - **CommissioningItem**（试车验证项）：计划 id、验证类型、目标值、实测值、合格判定（PASS/FAIL/IN_PROGRESS/PENDING）、验证日期、备注
@@ -340,7 +343,8 @@ L2 模块中所有日期字段都使用统一的 `DatePickerField`（原生 `<in
 |---|---|
 | 认证 | `POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/auth/me` |
 | 扩产 | `GET /api/boards/expansion/views/{overview\|timeline\|evidence}` |
-| 扩产编辑 | `PATCH /api/expansion-plans/{id}`、`POST /api/expansion-plans/{id}/evidence` |
+| 扩产 CRUD | `GET /api/expansion-plans`、`POST /api/expansion-plans`（可一并生成 4 个 L2 模块子节点）、`DELETE /api/expansion-plans/{id}`（软删除，打 `archived_at`）、`GET /api/expansion-meta`（供前端表单使用） |
+| 扩产编辑 | `PATCH /api/expansion-plans/{id}`、`PATCH /api/expansion-items/{id}`、`PATCH /api/approvals/{id}`、`PATCH /api/commissionings/{id}`、`PATCH /api/ramps/{id}`、`POST /api/evidence` |
 | 风险 | `GET /api/boards/risks/views/{overview\|by-type\|escalation\|closure}` |
 | 任务 | `GET /api/boards/tasks/views/{my-todo\|overdue\|escalation\|closure}` |
 | 通知 | `/api/notifications/*` |
