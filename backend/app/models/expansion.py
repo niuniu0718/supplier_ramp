@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..db import Base
@@ -29,9 +29,9 @@ class ExpansionPlan(Base):
     stage: Mapped[str] = mapped_column(String, default="采购设备")
     progress: Mapped[int] = mapped_column(Integer, default=0)
     expected_progress: Mapped[int] = mapped_column("expectedProgress", Integer, default=0)
-    status: Mapped[str] = mapped_column(String, default="GREEN")
+    status: Mapped[Optional[str]] = mapped_column(String, nullable=True, default=None)
     risk_types: Mapped[List[str]] = mapped_column("riskTypes", JSON, default=list)
-    risk_description: Mapped[str] = mapped_column("riskDescription", Text, default="")
+    risk_description: Mapped[Optional[str]] = mapped_column("riskDescription", Text, default="", nullable=True)
     owner_id: Mapped[str] = mapped_column("ownerId", String, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -73,7 +73,9 @@ class EvidenceChain(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     plan_id: Mapped[str] = mapped_column("planId", String, ForeignKey("expansion_plan.id", ondelete="CASCADE"), index=True)
-    category: Mapped[str] = mapped_column(String)
+    target_kind: Mapped[str] = mapped_column("targetKind", String, default="plan", index=True)
+    target_id: Mapped[Optional[int]] = mapped_column("targetId", Integer, nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String)  # 佐证名称，用户编辑
     file_name: Mapped[str] = mapped_column("fileName", String)
     stored_name: Mapped[str] = mapped_column("storedName", String)
     mime_type: Mapped[str] = mapped_column("mimeType", String)
@@ -81,7 +83,15 @@ class EvidenceChain(Base):
     url: Mapped[str] = mapped_column(String)
     note: Mapped[str] = mapped_column(Text, default="")
     uploaded_by_id: Mapped[str] = mapped_column("uploadedById", String)
+    uploaded_by_role: Mapped[str] = mapped_column("uploadedByRole", String, default="PROCUREMENT")
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    # 再认证字段：供应商上传的佐证需要责任采购确认
+    requires_verification: Mapped[bool] = mapped_column("requiresVerification", Boolean, default=False)
+    verification_status: Mapped[str] = mapped_column("verificationStatus", String, default="VERIFIED")  # PENDING / VERIFIED / REJECTED
+    verified_by_id: Mapped[Optional[str]] = mapped_column("verifiedById", String, nullable=True)
+    verified_at: Mapped[Optional[datetime]] = mapped_column("verifiedAt", DateTime, nullable=True)
+    verified_note: Mapped[str] = mapped_column("verifiedNote", Text, default="")
 
     plan: Mapped[ExpansionPlan] = relationship(back_populates="evidence")
 

@@ -49,6 +49,15 @@ def calculate_expected_progress(start: datetime, end: datetime, now: Optional[da
     return min(100, round((elapsed / total) * 100))
 
 
+def calculate_actual_progress(items) -> int:
+    """每个阀点（8 个）已完成算 1/8，未完成算 0；总进度 = 已完成 / 8 * 100"""
+    if not items:
+        return 0
+    total = len(items)
+    completed = sum(1 for it in items if getattr(it, "status", None) == "已完成")
+    return round(completed / total * 100)
+
+
 @dataclass(frozen=True)
 class ExpansionRiskResult:
     expected_progress: int
@@ -64,12 +73,11 @@ def calculate_expansion_risk(
     lag = max(0, expected - progress)
     overdue = now > end and progress < 100
 
+    # 阈值：滞后 ≥ 25% → 高风险；8% ≤ 滞后 < 25% → 中风险；< 8% → 低风险
     if overdue:
         return ExpansionRiskResult(expected, "RED", lag)
-    if lag > 30:
+    if lag >= 25:
         return ExpansionRiskResult(expected, "RED", lag)
-    if lag > 10:
+    if lag >= 8:
         return ExpansionRiskResult(expected, "ORANGE", lag)
-    if lag > 0:
-        return ExpansionRiskResult(expected, "YELLOW", lag)
     return ExpansionRiskResult(expected, "GREEN", lag)

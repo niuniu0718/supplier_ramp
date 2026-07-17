@@ -43,6 +43,29 @@ export interface ExpansionOverviewPayload {
   cards: ExpansionPlanCard[]
 }
 
+export type EvidenceVerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED'
+
+export interface EvidenceAttachment {
+  id: number
+  planId: string
+  targetKind: 'plan' | 'item' | 'approval' | 'commissioning' | 'ramp'
+  targetId: number | null
+  name: string
+  fileName: string
+  url: string
+  note: string
+  size: number
+  mimeType: string
+  uploadedAt: string
+  uploadedById: string
+  uploadedByRole: string
+  requiresVerification: boolean
+  verificationStatus: EvidenceVerificationStatus
+  verifiedById: string | null
+  verifiedAt: string | null
+  verifiedNote: string
+}
+
 export interface ExpansionMilestoneItem {
   id: number
   name: string
@@ -60,6 +83,7 @@ export interface ExpansionMilestoneItem {
   milestoneKey: string
   milestoneOrder: number
   milestoneName: string
+  evidence: EvidenceAttachment[]
 }
 
 export interface ExpansionTimelineRow {
@@ -73,16 +97,20 @@ export interface ExpansionTimelineRow {
   progress: number
   expectedProgress: number
   status: RiskLevel
+  autoStatus?: RiskLevel
   lag: number
+  riskDescription?: string
   itemCount: number
   overdueCount: number
   approvals: ApprovalRow[]
   commissionings: CommissioningRow[]
   ramps: RampRow[]
   items: ExpansionMilestoneItem[]
+  evidence: EvidenceAttachment[]
 }
 
 export interface ApprovalRow {
+  id: number
   order: number
   type: string
   name: string
@@ -93,9 +121,11 @@ export interface ApprovalRow {
   status: '未开始' | '进行中' | '已完成' | '已逾期'
   overdue: boolean
   note: string
+  evidence: EvidenceAttachment[]
 }
 
 export interface CommissioningRow {
+  id: number
   order: number
   type: string
   name: string
@@ -106,9 +136,11 @@ export interface CommissioningRow {
   passLabel: string
   verifiedAt: string | null
   note: string
+  evidence: EvidenceAttachment[]
 }
 
 export interface RampRow {
+  id: number
   order: number
   phase: string
   loadRate: number
@@ -119,6 +151,7 @@ export interface RampRow {
   status: 'PASS' | 'FAIL' | 'IN_PROGRESS' | 'PENDING'
   statusLabel: string
   note: string
+  evidence: EvidenceAttachment[]
 }
 
 export interface ExpansionTimelinePayload {
@@ -131,26 +164,38 @@ export interface ExpansionTimelinePayload {
 
 export interface EvidenceItem {
   id: number
-  category: string
-  categoryLabel: string
+  planId: string
+  targetKind: 'plan' | 'item' | 'approval' | 'commissioning' | 'ramp'
+  targetId: number | null
+  name: string
   fileName: string
   url: string
   mimeType: string
   size: number
   note: string
-  uploaderName: string
   uploadedAt: string
+  uploadedById: string
+  uploadedByRole: string
+  requiresVerification: boolean
+  verificationStatus: EvidenceVerificationStatus
+  verifiedById: string | null
+  verifiedAt: string | null
+  verifiedNote: string
+}
+
+export interface EvidenceNode {
+  kind: 'plan' | 'item' | 'approval' | 'commissioning' | 'ramp'
+  targetId: number | null
+  label: string
+  evidence: EvidenceItem[]
 }
 
 export interface EvidencePlanGroup {
   planId: string
   planName: string
   supplierName: string
-  materialName: string
-  progress: number
-  status: string
+  nodes: EvidenceNode[]
   evidenceCount: number
-  evidence: EvidenceItem[]
 }
 
 export interface ExpansionEvidencePayload {
@@ -159,7 +204,6 @@ export interface ExpansionEvidencePayload {
   generatedAt: string
   kpis: Kpi[]
   planGroups: EvidencePlanGroup[]
-  categoryCounts: Record<string, number>
 }
 
 export interface RiskRow {
@@ -328,6 +372,13 @@ export interface NotificationItem {
   isRead: boolean
   createdAt: string
 }
+
+export type EvidenceTarget =
+  | { kind: 'plan'; planId: string; planName: string }
+  | { kind: 'item'; planId: string; planName: string; targetId: number; targetLabel: string }
+  | { kind: 'approval'; planId: string; planName: string; targetId: number; targetLabel: string }
+  | { kind: 'commissioning'; planId: string; planName: string; targetId: number; targetLabel: string }
+  | { kind: 'ramp'; planId: string; planName: string; targetId: number; targetLabel: string }
 
 export interface BoardPayloadMap {
   expansion: {

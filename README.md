@@ -4,6 +4,19 @@
 
 ---
 
+## 近期更新（2026-07）
+
+| 模块 | 变更 |
+|---|---|
+| 关键审批事项 | 新增 `approval` 表 + 6 项标准审批（环评/安评/排污/节能/危化品/建设用地），状态由后端按日期推算（已完成/进行中/未开始/已逾期） |
+| 证据再认证 | 上传证据支持「待认证 / 已认证 / 已退回」三态，采购/质控可在线驳回并要求重新上传 |
+| 证据预览 | 关键审批 / 试车验证 / 量产爬坡 / 证据档案四处的佐证 chip 改为可点击，直接内嵌预览图片 / PDF |
+| 风险自动重算 | 取消计划级风险的手动覆盖入口，扩产风险由 8 个阀点状态自动计算（已完成/总数 × 100%） |
+| 阀点字段改名 | 阀点明细内的「计划到货日期 / 实际到货日期」改名为「计划完成日期 / 实际完成日期」 |
+| 日期选择器 | 移除「今天 / 本月 / 按月 / 按日」按钮组，回到原生 `<input type="date">`；保留一个轻量的「×」清除按钮，并在清除瞬间给出 1.2s 的「✓ 已清除」反馈 |
+
+---
+
 ## 目录
 
 - [技术栈](#技术栈)
@@ -58,8 +71,12 @@ supplier_ramp/
 │   └── requirements.txt
 ├── src/                           # React 前端
 │   ├── pages/                     # 三大板块页面（expansion / risks / tasks）
-│   ├── components/                # 通用组件（BoardShell、KpiCard、StatusBadge…）
-│   ├── lib/                       # api 封装、里程碑/审批/验证/爬坡常量与状态映射
+│   ├── components/                # 通用组件
+│   │   ├── ui/                    # DatePickerField / Modal / KpiCard / StatusBadge …
+│   │   └── expansion/             # PlanEditModal / MilestoneEditModal / ApprovalEditModal
+│   │                             # CommissioningEditModal / RampEditModal
+│   │                             # EvidenceChipList / EvidencePreviewModal / EvidenceUploadModal / EvidenceVerifyModal
+│   ├── lib/                       # api、里程碑/审批/验证/爬坡常量与状态映射、editOptions
 │   ├── styles/globals.css         # 全局样式
 │   ├── App.tsx                    # 路由
 │   └── types.ts                   # 前端类型
@@ -217,8 +234,16 @@ npm config set registry https://registry.npmmirror.com
 | **试车验证记录** | `commissioning_item`（6 项验证） | 目标值 / 实测值 / 合格判定 / 验证日期 / 备注 | 设备调试到量产前的质量关卡，留痕可追溯 |
 | **量产爬坡计划跟踪** | `ramp_item`（4 阶段爬坡） | 阶段 / 负荷率 / 目标产能 / 计划周期 / 实际达成 / 达标状态 | 监控从 40% 负荷到 100% 全产能的爬坡节奏 |
 
+L2 模块中所有日期字段都使用统一的 `DatePickerField`（原生 `<input type="date">` + 右侧 × 清除按钮），清除瞬间会闪现 1.2s 的绿色「✓ 已清除」反馈，避免和未填状态混淆。
+
 #### ③ 证据档案 `/board/expansion/view/evidence`
-按计划分组的时间线，展示每个阀点上传的设备到货照、合同、付款凭证等。点击文件可下载（前端 `/uploads/{文件名}` 直链）。
+按计划分组的时间线，展示每个阀点上传的设备到货照、合同、付款凭证等。每个佐证文件支持三种状态：
+
+- **待认证**（橙色 chip）— 上传后等待采购/质控审核
+- **已认证**（绿色 chip）— 审核通过，作为该阀点完成的依据
+- **已退回**（红色 chip + 退回原因）— 审核驳回，需重新上传
+
+点击任何佐证 chip 会打开内嵌预览（图片直接显示、PDF 用 iframe 渲染），不需要下载到本地。
 
 ### 风险（4 个视图）
 

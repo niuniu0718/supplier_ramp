@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
@@ -18,6 +19,7 @@ from ..services.ramp_phases import RAMP_BY_PHASE
 from ..services.milestone_template import milestone_name
 from ..services.risk_engine import (
     calculate_expansion_risk,
+    calculate_actual_progress,
     calculate_expected_progress,
 )
 
@@ -25,7 +27,10 @@ router = APIRouter(prefix="/api", tags=["expansion"])
 
 
 def _enrich_plan(plan: ExpansionPlan) -> Dict[str, Any]:
-    result = calculate_expansion_risk(plan.start_date, plan.end_date, plan.progress)
+    actual = calculate_actual_progress(plan.items)
+    result = calculate_expansion_risk(plan.start_date, plan.end_date, actual)
+    # 用户手动覆盖的 plan.status 优先；未设置时回退到自动算出的 result.status
+    effective_status = plan.status if plan.status else result.status
     return {
         "id": plan.id,
         "materialId": plan.material_id,
@@ -41,9 +46,12 @@ def _enrich_plan(plan: ExpansionPlan) -> Dict[str, Any]:
         "investedCapex": plan.invested_capex,
         "totalCapex": plan.total_capex,
         "fundingSources": plan.funding_sources or [],
-        "progress": plan.progress,
+        "progress": actual,
+        "completedItemCount": sum(1 for it in plan.items if it.status == "已完成"),
+        "totalItemCount": len(plan.items),
         "expectedProgress": result.expected_progress,
-        "status": result.status,
+        "status": effective_status,
+        "autoStatus": result.status,
         "lag": result.lag,
         "riskTypes": plan.risk_types or [],
         "riskDescription": plan.risk_description,
@@ -97,6 +105,7 @@ def _enrich_approval(a: Approval) -> Dict[str, Any]:
         status = "进行中"
         overdue = False
     return {
+        "id": a.id,
         "order": tmpl.get("order", 99),
         "type": a.type,
         "name": tmpl.get("name", a.type),
@@ -121,6 +130,7 @@ PASS_STATUS_META = {
 def _enrich_commissioning(c: CommissioningItem) -> Dict[str, Any]:
     tmpl = COMMISSIONING_BY_KEY.get(c.type, {"order": 99, "name": c.type, "standard": ""})
     return {
+        "id": c.id,
         "order": tmpl.get("order", 99),
         "type": c.type,
         "name": tmpl.get("name", c.type),
@@ -145,6 +155,7 @@ RAMP_STATUS_META = {
 def _enrich_ramp(r: RampItem) -> Dict[str, Any]:
     tmpl = RAMP_BY_PHASE.get(r.phase, {"order": 99, "loadRate": r.target_load_rate, "period": ""})
     return {
+        "id": r.id,
         "order": tmpl.get("order", 99),
         "phase": r.phase,
         "loadRate": r.target_load_rate,
@@ -234,13 +245,36 @@ def expansion_timeline(
     rows = []
     overdue_total = 0
     item_total = 0
+    plan_ids = [p.id for p in plans]
+    evidence_by_node: Dict[tuple, List[EvidenceChain]] = {}
+    if plan_ids:
+        all_evidence = db.query(EvidenceChain).filter(EvidenceChain.plan_id.in_(plan_ids)).all()
+        for e in all_evidence:
+            key = (e.plan_id, e.target_kind, e.target_id)
+            evidence_by_node.setdefault(key, []).append(e)
     for p in plans:
-        result = calculate_expansion_risk(p.start_date, p.end_date, p.progress)
+        actual = calculate_actual_progress(p.items)
+        result = calculate_expansion_risk(p.start_date, p.end_date, actual)
+        effective_status = p.status if p.status else result.status
         sorted_items = sorted(p.items, key=lambda it: (it.milestone_order or 0, it.id))
-        items = [_enrich_item(it, min_start, total) for it in sorted_items]
+        items = []
+        for it in sorted_items:
+            row = _enrich_item(it, min_start, total)
+            row["evidence"] = [_enrich_evidence(e) for e in evidence_by_node.get((p.id, "item", it.id), [])]
+            items.append(row)
+        approvals = [_enrich_approval(a) for a in sorted(p.approvals, key=lambda x: APPROVAL_BY_KEY.get(x.type, {}).get("order", 99))]
+        for a in approvals:
+            a["evidence"] = [_enrich_evidence(e) for e in evidence_by_node.get((p.id, "approval", a["id"]), [])]
+        commissionings = [_enrich_commissioning(c) for c in sorted(p.commissionings, key=lambda x: COMMISSIONING_BY_KEY.get(x.type, {}).get("order", 99))]
+        for c in commissionings:
+            c["evidence"] = [_enrich_evidence(e) for e in evidence_by_node.get((p.id, "commissioning", c["id"]), [])]
+        ramps = [_enrich_ramp(r) for r in sorted(p.ramps, key=lambda x: RAMP_BY_PHASE.get(x.phase, {}).get("order", 99))]
+        for r in ramps:
+            r["evidence"] = [_enrich_evidence(e) for e in evidence_by_node.get((p.id, "ramp", r["id"]), [])]
         overdue = sum(1 for i in items if i["overdue"])
         overdue_total += overdue
         item_total += len(items)
+        plan_evidence = [_enrich_evidence(e) for e in evidence_by_node.get((p.id, "plan", None), [])]
         rows.append({
             "id": p.id,
             "name": p.name,
@@ -249,16 +283,21 @@ def expansion_timeline(
             "startDate": p.start_date.isoformat(),
             "endDate": p.end_date.isoformat(),
             "stage": p.stage,
-            "progress": p.progress,
+            "progress": actual,
+            "completedItemCount": sum(1 for it in p.items if it.status == "已完成"),
+            "totalItemCount": len(p.items),
             "expectedProgress": result.expected_progress,
-            "status": result.status,
+            "status": effective_status,
+            "autoStatus": result.status,
             "lag": result.lag,
+            "riskDescription": p.risk_description,
             "itemCount": len(items),
             "overdueCount": overdue,
-            "approvals": [_enrich_approval(a) for a in sorted(p.approvals, key=lambda x: APPROVAL_BY_KEY.get(x.type, {}).get("order", 99))],
-            "commissionings": [_enrich_commissioning(c) for c in sorted(p.commissionings, key=lambda x: COMMISSIONING_BY_KEY.get(x.type, {}).get("order", 99))],
-            "ramps": [_enrich_ramp(r) for r in sorted(p.ramps, key=lambda x: RAMP_BY_PHASE.get(x.phase, {}).get("order", 99))],
+            "approvals": approvals,
+            "commissionings": commissionings,
+            "ramps": ramps,
             "items": items,
+            "evidence": plan_evidence,
         })
 
     invested = sum(p.invested_capex for p in plans) / 10000
@@ -288,37 +327,93 @@ def expansion_evidence(
 ):
     plans = (
         db.query(ExpansionPlan)
-        .options(selectinload(ExpansionPlan.supplier), selectinload(ExpansionPlan.evidence))
-        .order_by(ExpansionPlan.updated_at.desc())
+        .options(
+            selectinload(ExpansionPlan.supplier),
+            selectinload(ExpansionPlan.items),
+            selectinload(ExpansionPlan.approvals),
+            selectinload(ExpansionPlan.commissionings),
+            selectinload(ExpansionPlan.ramps),
+        )
+        .order_by(ExpansionPlan.start_date.asc())
         .all()
     )
     plan_groups = []
     total = 0
-    by_cat: Dict[str, int] = {}
+    pending_count = 0
+    rejected_count = 0
+    plans_with_evidence = 0
+    node_labels: Dict[tuple, str] = {}
     for p in plans:
-        if not p.evidence:
-            continue
-        ev = []
-        for e in p.evidence:
-            ev.append({
-                "id": e.id,
-                "fileName": e.file_name,
-                "category": e.category,
-                "url": e.url,
-                "note": e.note,
-                "uploadedAt": e.uploaded_at.isoformat() if e.uploaded_at else None,
-                "uploadedById": e.uploaded_by_id,
-                "size": e.size,
-                "mimeType": e.mime_type,
-            })
-            total += 1
-            by_cat[e.category] = by_cat.get(e.category, 0) + 1
         plan_groups.append({
             "planId": p.id,
             "planName": p.name,
             "supplierName": p.supplier.short_name if p.supplier else "",
-            "evidence": ev,
+            "nodes": [],
         })
+    for p in plans:
+        items_by_id = {it.id: it for it in p.items}
+        approvals_by_id = {a.id: a for a in p.approvals}
+        commissionings_by_id = {c.id: c for c in p.commissionings}
+        ramps_by_id = {r.id: r for r in p.ramps}
+        evidence_rows = (
+            db.query(EvidenceChain)
+            .filter(EvidenceChain.plan_id == p.id)
+            .order_by(EvidenceChain.uploaded_at.desc())
+            .all()
+        )
+        if not evidence_rows:
+            continue
+        plans_with_evidence += 1
+        # Build nodes list
+        nodes_map: Dict[str, Dict[str, Any]] = {}
+        for e in evidence_rows:
+            total += 1
+            if e.requires_verification:
+                pending_count += 1
+            if e.requires_verification and e.verification_status == "REJECTED":
+                rejected_count += 1
+            key = e.target_kind
+            target_id = e.target_id
+            if key == "plan":
+                node_key = "plan"
+                label = "整计划"
+            elif key == "item" and target_id in items_by_id:
+                node_key = f"item:{target_id}"
+                it = items_by_id[target_id]
+                label = f"阀点 {it.milestone_order or '-'} · {it.name}"
+            elif key == "approval" and target_id in approvals_by_id:
+                node_key = f"approval:{target_id}"
+                a = approvals_by_id[target_id]
+                tmpl = APPROVAL_BY_KEY.get(a.type, {})
+                label = f"审批 · {tmpl.get('name', a.type)}"
+            elif key == "commissioning" and target_id in commissionings_by_id:
+                node_key = f"commissioning:{target_id}"
+                c = commissionings_by_id[target_id]
+                tmpl = COMMISSIONING_BY_KEY.get(c.type, {})
+                label = f"试车 · {tmpl.get('name', c.type)}"
+            elif key == "ramp" and target_id in ramps_by_id:
+                node_key = f"ramp:{target_id}"
+                r = ramps_by_id[target_id]
+                tmpl = RAMP_BY_PHASE.get(r.phase, {})
+                label = f"爬坡 · {r.phase} ({tmpl.get('loadRate', '-')}%)"
+            else:
+                node_key = f"{key}:{target_id or 0}"
+                label = f"{key} #{target_id or '-'}"
+            node = nodes_map.setdefault(node_key, {
+                "kind": key,
+                "targetId": target_id,
+                "label": label,
+                "evidence": [],
+            })
+            node["evidence"].append(_enrich_evidence(e))
+        # Find this plan's group (last one for p.id)
+        target_group = next((g for g in plan_groups if g["planId"] == p.id), None)
+        if target_group is None:
+            continue
+        target_group["nodes"] = list(nodes_map.values())
+        target_group["evidenceCount"] = total if False else len(evidence_rows)
+
+    plan_groups = [g for g in plan_groups if g["nodes"]]
 
     return {
         "board": "expansion",
@@ -326,14 +421,43 @@ def expansion_evidence(
         "generatedAt": datetime.utcnow().isoformat() + "Z",
         "kpis": [
             {"label": "证据总数", "value": total, "unit": "份", "tone": "blue"},
-            {"label": "覆盖计划", "value": len(plan_groups), "unit": "项", "tone": "green",
+            {"label": "覆盖计划", "value": plans_with_evidence, "unit": "项", "tone": "green",
              "hint": f"共 {len(plans)} 项"},
-            {"label": "设备到货照", "value": by_cat.get("DEVICE_PHOTO", 0), "unit": "份", "tone": "orange"},
-            {"label": "合同/凭证", "value": by_cat.get("CONTRACT", 0) + by_cat.get("PAYMENT", 0), "unit": "份",
-             "tone": "purple"},
+            {"label": "待认证", "value": pending_count, "unit": "份", "tone": "orange",
+             "hint": "供应商上传的佐证需责任采购再认证"},
+            {"label": "已退回", "value": rejected_count, "unit": "份", "tone": "red"},
         ],
         "planGroups": plan_groups,
     }
+
+
+def _apply_partial(obj, allowed: set, body: dict, datetime_fields: set = None) -> None:
+    datetime_fields = datetime_fields or set()
+    mapper = inspect(obj.__class__)
+    for key, value in body.items():
+        camel = "".join(p.capitalize() if i else p for i, p in enumerate(key.split("_")))
+        target_key = key if key in allowed or key in datetime_fields else camel
+        if target_key not in allowed and target_key not in datetime_fields:
+            continue
+        if value is None or value == "":
+            # 仅当列可空时才把空字符串 / null 置为 None；
+            # 不可空的 Text 列（如 expansion_item.note）保留空字符串，避免 NOT NULL 约束报错
+            column = mapper.columns.get(target_key)
+            if column is None or column.nullable:
+                setattr(obj, target_key, None)
+            else:
+                setattr(obj, target_key, "")
+            continue
+        if target_key in datetime_fields and isinstance(value, str):
+            cleaned = value.replace("Z", "").strip()
+            try:
+                value = datetime.fromisoformat(cleaned)
+            except ValueError:
+                try:
+                    value = datetime.strptime(cleaned, "%Y-%m-%d")
+                except ValueError:
+                    continue
+        setattr(obj, target_key, value)
 
 
 @router.patch("/expansion-plans/{plan_id}")
@@ -346,30 +470,156 @@ def update_plan(
     plan = db.get(ExpansionPlan, plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="计划不存在。")
-    allowed = {"progress", "stage", "risk_description", "expected_progress", "status"}
-    for key, value in body.items():
-        camel = "".join(p.capitalize() if i else p for i, p in enumerate(key.split("_")))
-        if key in allowed or camel in allowed:
-            setattr(plan, key, value)
+    _apply_partial(plan, {"risk_description"}, body)
     db.commit()
     db.refresh(plan)
     return {"plan": _enrich_plan(plan)}
 
 
-@router.post("/expansion-plans/{plan_id}/evidence")
+@router.patch("/expansion-items/{item_id}")
+def update_item(
+    item_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_session),
+):
+    item = db.get(ExpansionItem, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="阀点不存在。")
+    _apply_partial(item, {
+        "status", "supplier_action", "procurement_action", "note",
+    }, body, datetime_fields={"expected_arrival", "actual_arrival"})
+    db.commit()
+    db.refresh(item)
+    starts = ends = [item.expected_arrival.timestamp() * 1000]
+    return {"item": _enrich_item(item, starts[0], 0)}
+
+
+@router.patch("/approvals/{approval_id}")
+def update_approval(
+    approval_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_session),
+):
+    a = db.get(Approval, approval_id)
+    if not a:
+        raise HTTPException(status_code=404, detail="审批事项不存在。")
+    _apply_partial(a, {"note"}, body,
+                   datetime_fields={"submitted_at", "expected_at", "actual_at"})
+    db.commit()
+    db.refresh(a)
+    return {"approval": _enrich_approval(a)}
+
+
+@router.patch("/commissionings/{commissioning_id}")
+def update_commissioning(
+    commissioning_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_session),
+):
+    c = db.get(CommissioningItem, commissioning_id)
+    if not c:
+        raise HTTPException(status_code=404, detail="试车验证项不存在。")
+    _apply_partial(c, {
+        "target_value", "actual_value", "pass_status", "note",
+    }, body, datetime_fields={"verified_at"})
+    db.commit()
+    db.refresh(c)
+    return {"commissioning": _enrich_commissioning(c)}
+
+
+@router.patch("/ramps/{ramp_id}")
+def update_ramp(
+    ramp_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_session),
+):
+    r = db.get(RampItem, ramp_id)
+    if not r:
+        raise HTTPException(status_code=404, detail="爬坡阶段不存在。")
+    _apply_partial(r, {
+        "actual_capacity", "status", "note",
+    }, body, datetime_fields={"confirmed_at"})
+    db.commit()
+    db.refresh(r)
+    return {"ramp": _enrich_ramp(r)}
+
+
+EVIDENCE_TARGET_KINDS = {"plan", "item", "approval", "commissioning", "ramp"}
+EVIDENCE_VERIFICATION_STATUS = {"PENDING", "VERIFIED", "REJECTED"}
+
+
+def _enrich_evidence(e) -> Dict[str, Any]:
+    return {
+        "id": e.id,
+        "planId": e.plan_id,
+        "targetKind": e.target_kind,
+        "targetId": e.target_id,
+        "name": e.name,
+        "fileName": e.file_name,
+        "url": e.url,
+        "note": e.note,
+        "size": e.size,
+        "mimeType": e.mime_type,
+        "uploadedAt": e.uploaded_at.isoformat() if e.uploaded_at else None,
+        "uploadedById": e.uploaded_by_id,
+        "uploadedByRole": e.uploaded_by_role,
+        "requiresVerification": bool(e.requires_verification),
+        "verificationStatus": e.verification_status,
+        "verifiedById": e.verified_by_id,
+        "verifiedAt": e.verified_at.isoformat() if e.verified_at else None,
+        "verifiedNote": e.verified_note,
+    }
+
+
+def _resolve_target_plan_id(db: Session, kind: str, target_id) -> str | None:
+    if kind not in EVIDENCE_TARGET_KINDS:
+        return None
+    if kind == "plan":
+        obj = db.get(ExpansionPlan, target_id)
+    elif kind == "item":
+        obj = db.get(ExpansionItem, target_id)
+    elif kind == "approval":
+        obj = db.get(Approval, target_id)
+    elif kind == "commissioning":
+        obj = db.get(CommissioningItem, target_id)
+    elif kind == "ramp":
+        obj = db.get(RampItem, target_id)
+    return obj.plan_id if obj and hasattr(obj, "plan_id") else (obj.id if obj and kind == "plan" else None)
+
+
+@router.post("/evidence")
 def upload_evidence(
-    plan_id: str,
     file: UploadFile = File(...),
-    category: str = Form("OTHER"),
+    target_kind: str = Form("plan"),
+    target_id: str = Form(""),
+    name: str = Form(""),
     note: str = Form(""),
     db: Session = Depends(get_db),
     _: str = Depends(require_session),
 ):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="请选择文件。")
+    if target_kind not in EVIDENCE_TARGET_KINDS:
+        raise HTTPException(status_code=400, detail=f"不支持的目标类型：{target_kind}")
+    if target_kind == "plan":
+        plan_id = target_id
+    else:
+        try:
+            parsed_id = int(target_id)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="请提供有效的目标节点 ID。")
+        plan_id = _resolve_target_plan_id(db, target_kind, parsed_id)
+    if not plan_id:
+        raise HTTPException(status_code=404, detail="目标节点不存在。")
     plan = db.get(ExpansionPlan, plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="计划不存在。")
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="请选择文件。")
+    # 佐证名称：未填时回退到文件名（去掉扩展名）
+    display_name = (name or "").strip() or os.path.splitext(file.filename)[0]
     ext = os.path.splitext(file.filename)[1].lower()
     stored_name = f"{uuid.uuid4().hex}{ext}"
     target = settings.upload_dir / stored_name
@@ -385,9 +635,12 @@ def upload_evidence(
                 target.unlink(missing_ok=True)
                 raise HTTPException(status_code=413, detail="文件过大。")
             f.write(chunk)
+    node_id = int(target_id) if target_kind != "plan" and target_id else None
     evidence = EvidenceChain(
         plan_id=plan_id,
-        category=category,
+        target_kind=target_kind,
+        target_id=node_id,
+        name=display_name,
         file_name=file.filename,
         stored_name=stored_name,
         mime_type=file.content_type or "application/octet-stream",
@@ -395,18 +648,53 @@ def upload_evidence(
         url=f"/uploads/{stored_name}",
         note=note,
         uploaded_by_id="admin",
+        uploaded_by_role="PROCUREMENT",
+        requires_verification=False,
+        verification_status="VERIFIED",
     )
     db.add(evidence)
     db.commit()
     db.refresh(evidence)
-    return {
-        "evidence": {
-            "id": evidence.id,
-            "planId": evidence.plan_id,
-            "category": evidence.category,
-            "fileName": evidence.file_name,
-            "url": evidence.url,
-            "note": evidence.note,
-            "uploadedAt": evidence.uploaded_at.isoformat() if evidence.uploaded_at else None,
-        }
-    }
+    return {"evidence": _enrich_evidence(evidence)}
+
+
+@router.patch("/evidence/{evidence_id}")
+def update_evidence(
+    evidence_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_session),
+):
+    """编辑佐证名称 / 备注"""
+    e = db.get(EvidenceChain, evidence_id)
+    if not e:
+        raise HTTPException(status_code=404, detail="佐证不存在。")
+    _apply_partial(e, {"name", "note"}, body)
+    db.commit()
+    db.refresh(e)
+    return {"evidence": _enrich_evidence(e)}
+
+
+@router.patch("/evidence/{evidence_id}/verify")
+def verify_evidence(
+    evidence_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_session),
+):
+    """再认证：通过 / 退回供应商上传的佐证"""
+    e = db.get(EvidenceChain, evidence_id)
+    if not e:
+        raise HTTPException(status_code=404, detail="佐证不存在。")
+    action = body.get("action")
+    if action not in ("verify", "reject"):
+        raise HTTPException(status_code=400, detail="action 必须为 verify 或 reject。")
+    if not e.requires_verification:
+        raise HTTPException(status_code=400, detail="该佐证不需要再认证。")
+    e.verification_status = "VERIFIED" if action == "verify" else "REJECTED"
+    e.verified_by_id = "admin"
+    e.verified_at = datetime.utcnow()
+    e.verified_note = body.get("note", "")
+    db.commit()
+    db.refresh(e)
+    return {"evidence": _enrich_evidence(e)}

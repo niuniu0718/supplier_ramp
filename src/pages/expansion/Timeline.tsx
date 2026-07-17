@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Paperclip, Pencil, Upload, type LucideIcon } from 'lucide-react'
 import { BoardShell } from '../../components/layout/BoardShell'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { ErrorState, LoadingState } from '../../components/ui/States'
+import { PlanEditModal } from '../../components/expansion/PlanEditModal'
+import { MilestoneEditModal } from '../../components/expansion/MilestoneEditModal'
+import { EvidenceChipList } from '../../components/expansion/EvidenceChipList'
+import { EvidencePreviewModal } from '../../components/expansion/EvidencePreviewModal'
+import { ApprovalEditModal } from '../../components/expansion/ApprovalEditModal'
+import { CommissioningEditModal } from '../../components/expansion/CommissioningEditModal'
+import { RampEditModal } from '../../components/expansion/RampEditModal'
+import { EvidenceUploadModal } from '../../components/expansion/EvidenceUploadModal'
 import { api } from '../../lib/api'
 import { APPROVAL_CYCLE_BY_KEY, approvalStatusMeta } from '../../lib/approval'
 import { MILESTONE_TEMPLATE, milestoneStatusMeta } from '../../lib/milestone'
@@ -12,6 +20,7 @@ import { RAMP_PHASES, rampStatusMeta } from '../../lib/ramp'
 import type {
   ApprovalRow,
   CommissioningRow,
+  EvidenceAttachment,
   ExpansionMilestoneItem,
   ExpansionTimelinePayload,
   ExpansionTimelineRow,
@@ -55,9 +64,27 @@ function fmtYM(iso: string | null) {
   return `${yy}/${mm}/${dd}`
 }
 
+type EvidenceTarget =
+  | { kind: 'plan'; planId: string; planName: string }
+  | { kind: 'item'; planId: string; planName: string; targetId: number; targetLabel: string }
+  | { kind: 'approval'; planId: string; planName: string; targetId: number; targetLabel: string }
+  | { kind: 'commissioning'; planId: string; planName: string; targetId: number; targetLabel: string }
+  | { kind: 'ramp'; planId: string; planName: string; targetId: number; targetLabel: string }
+
 export function ExpansionTimeline() {
   const [data, setData] = useState<ExpansionTimelinePayload | null>(null)
   const [error, setError] = useState('')
+  const [editingPlan, setEditingPlan] = useState<ExpansionTimelineRow | null>(null)
+  const [uploadingAt, setUploadingAt] = useState<EvidenceTarget | null>(null)
+  const [editingItem, setEditingItem] = useState<ExpansionMilestoneItem | null>(null)
+  const [editingApproval, setEditingApproval] = useState<ApprovalRow | null>(null)
+  const [editingCommissioning, setEditingCommissioning] = useState<CommissioningRow | null>(null)
+  const [editingRamp, setEditingRamp] = useState<RampRow | null>(null)
+  const [previewEvidence, setPreviewEvidence] = useState<EvidenceAttachment | null>(null)
+
+  function reload() {
+    return api.get<ExpansionTimelinePayload>('/api/boards/expansion/views/timeline').then(setData)
+  }
 
   useEffect(() => {
     api.get<ExpansionTimelinePayload>('/api/boards/expansion/views/timeline')
@@ -254,8 +281,8 @@ export function ExpansionTimeline() {
                       ? [
                           `阀点 ${number} · ${m.name}`,
                           `状态：${meta?.label ?? item.status}`,
-                          `计划：${fmtYM(item.expectedArrival)}`,
-                          `实际：${item.actualArrival ? fmtYM(item.actualArrival) : '—'}`,
+                          `计划完成：${fmtYM(item.expectedArrival)}`,
+                          `实际完成：${item.actualArrival ? fmtYM(item.actualArrival) : '—'}`,
                           overdue ? `逾期 ${item.delayDays} 天` : '',
                         ].filter(Boolean)
                       : [`阀点 ${number} · ${m.name}`, '状态：未开始']
@@ -293,7 +320,15 @@ export function ExpansionTimeline() {
                 <strong>{row.name}</strong>
                 <small className="muted">{row.supplierName} · {row.materialName}</small>
               </div>
-              <StatusBadge status={row.status} short />
+              <div className="plan-actions">
+                <button type="button" className="text-button text-button-primary" onClick={() => setEditingPlan(row)}>
+                  <Pencil size={12} /> 编辑计划
+                </button>
+                <button type="button" className="text-button" onClick={() => setUploadingAt({ kind: 'plan', planId: row.id, planName: row.name })}>
+                  <Upload size={12} /> 上传佐证
+                </button>
+                <StatusBadge status={row.status} short />
+              </div>
             </header>
             <section className="timeline-plan-section">
               <header className="timeline-plan-section-head">
@@ -303,6 +338,7 @@ export function ExpansionTimeline() {
               <div className="milestone-grid">
                 {MILESTONE_TEMPLATE.map((tmpl, idx) => {
                   const item = row.items.find((it) => it.milestoneKey === tmpl.key)
+                  const itemLabel = item ? `阀点 ${idx + 1} · ${tmpl.name}` : `阀点 ${idx + 1} · ${tmpl.name}`
                   return (
                     <MilestoneCard
                       key={tmpl.key}
@@ -310,23 +346,118 @@ export function ExpansionTimeline() {
                       templateName={tmpl.name}
                       TemplateIcon={tmpl.icon}
                       item={item}
+                      itemLabel={itemLabel}
+                      onEdit={item ? () => setEditingItem(item) : undefined}
+                      onUploadEvidence={item ? () => setUploadingAt({
+                        kind: 'item',
+                        planId: row.id,
+                        planName: row.name,
+                        targetId: item.id,
+                        targetLabel: `阀点 ${idx + 1} · ${tmpl.name}`,
+                      }) : undefined}
                     />
                   )
                 })}
               </div>
             </section>
             <section className="timeline-plan-section">
-              <ApprovalSection approvals={row.approvals} />
+              <ApprovalSection
+                approvals={row.approvals}
+                onEdit={setEditingApproval}
+                onUploadEvidence={(a, label) => setUploadingAt({
+                  kind: 'approval',
+                  planId: row.id,
+                  planName: row.name,
+                  targetId: a.id,
+                  targetLabel: label,
+                })}
+                onPreviewEvidence={setPreviewEvidence}
+              />
             </section>
             <section className="timeline-plan-section">
-              <CommissioningSection commissionings={row.commissionings} />
+              <CommissioningSection
+                commissionings={row.commissionings}
+                onEdit={setEditingCommissioning}
+                onUploadEvidence={(c, label) => setUploadingAt({
+                  kind: 'commissioning',
+                  planId: row.id,
+                  planName: row.name,
+                  targetId: c.id,
+                  targetLabel: label,
+                })}
+                onPreviewEvidence={setPreviewEvidence}
+              />
             </section>
             <section className="timeline-plan-section">
-              <RampSection ramps={row.ramps} />
+              <RampSection
+                ramps={row.ramps}
+                onEdit={setEditingRamp}
+                onUploadEvidence={(r, label) => setUploadingAt({
+                  kind: 'ramp',
+                  planId: row.id,
+                  planName: row.name,
+                  targetId: r.id,
+                  targetLabel: label,
+                })}
+                onPreviewEvidence={setPreviewEvidence}
+              />
             </section>
           </div>
         ))}
       </section>
+
+      {editingPlan && (
+        <PlanEditModal plan={editingPlan} onClose={() => setEditingPlan(null)} onSaved={reload} />
+      )}
+      {uploadingAt && (
+        <EvidenceUploadModal
+          planId={uploadingAt.planId}
+          planName={uploadingAt.planName}
+          targetKind={uploadingAt.kind}
+          targetId={uploadingAt.kind === 'plan' ? null : uploadingAt.targetId}
+          targetLabel={uploadingAt.kind === 'plan' ? undefined : uploadingAt.targetLabel}
+          onClose={() => setUploadingAt(null)}
+          onUploaded={async () => { await reload() }}
+        />
+      )}
+      {editingItem && (
+        <MilestoneEditModal
+          item={editingItem}
+          planId={editingItem.type}
+          onClose={() => setEditingItem(null)}
+          onSaved={reload}
+        />
+      )}
+      {editingApproval && (
+        <ApprovalEditModal
+          row={editingApproval}
+          approvalId={editingApproval.id}
+          onClose={() => setEditingApproval(null)}
+          onSaved={reload}
+        />
+      )}
+      {editingCommissioning && (
+        <CommissioningEditModal
+          row={editingCommissioning}
+          commissioningId={editingCommissioning.id}
+          onClose={() => setEditingCommissioning(null)}
+          onSaved={reload}
+        />
+      )}
+      {editingRamp && (
+        <RampEditModal
+          row={editingRamp}
+          rampId={editingRamp.id}
+          onClose={() => setEditingRamp(null)}
+          onSaved={reload}
+        />
+      )}
+      {previewEvidence && (
+        <EvidencePreviewModal
+          evidence={previewEvidence}
+          onClose={() => setPreviewEvidence(null)}
+        />
+      )}
     </BoardShell>
   )
 }
@@ -346,14 +477,18 @@ interface MilestoneCardProps {
   templateName: string
   TemplateIcon: LucideIcon
   item?: ExpansionMilestoneItem
+  itemLabel?: string
+  onEdit?: () => void
+  onUploadEvidence?: () => void
 }
 
-function MilestoneCard({ order, templateName, TemplateIcon, item }: MilestoneCardProps) {
-  const meta = item ? milestoneStatusMeta(item.status) : milestoneStatusMeta('待开始')
-  const Icon = item ? TemplateIcon : TemplateIcon
+function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUploadEvidence }: MilestoneCardProps) {
+  const meta = item ? milestoneStatusMeta(item.status) : milestoneStatusMeta('未开始')
+  const Icon = TemplateIcon
   const overdue = item?.overdue ?? false
   const tone = overdue ? 'overdue' : meta.tone
   const pillMeta = PILL_META[tone]
+  const evCount = item?.evidence.length ?? 0
   return (
     <div className={`milestone-card ${overdue ? 'is-overdue' : ''} tone-${tone}`}>
       <header className="milestone-card-head">
@@ -376,13 +511,19 @@ function MilestoneCard({ order, templateName, TemplateIcon, item }: MilestoneCar
       </header>
       <div className="milestone-card-dates">
         <div>
-          <small className="muted">计划</small>
+          <small className="muted">计划完成</small>
           <span>{item ? fmtDate(item.expectedArrival) : '—'}</span>
         </div>
         <div>
-          <small className="muted">实际</small>
+          <small className="muted">实际完成</small>
           <span className={item?.actualArrival ? '' : 'muted'}>
             {item?.actualArrival ? fmtDate(item.actualArrival) : '—'}
+          </span>
+        </div>
+        <div>
+          <small className="muted">佐证</small>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Paperclip size={11} className="muted" /> {evCount}
           </span>
         </div>
       </div>
@@ -396,11 +537,49 @@ function MilestoneCard({ order, templateName, TemplateIcon, item }: MilestoneCar
           <p>{item?.procurementAction || '尚未约定'}</p>
         </div>
       </div>
+      {item?.note && (
+        <div className="milestone-card-note">
+          <small className="muted">备注</small>
+          <p>{item.note}</p>
+        </div>
+      )}
+      {item && (
+        <footer className="milestone-card-foot">
+          {evCount > 0 && (
+            <div className="evidence-chip-row">
+              {item.evidence.slice(0, 3).map((e) => (
+                <a key={e.id} href={e.url} target="_blank" rel="noreferrer"
+                   className={`evidence-chip verification-${e.verificationStatus === 'VERIFIED' ? 'verified' : e.verificationStatus === 'REJECTED' ? 'rejected' : e.requiresVerification ? 'pending' : 'neutral'}`}
+                   title={`${e.name}${e.requiresVerification ? ` · ${e.verificationStatus === 'VERIFIED' ? '已认证' : e.verificationStatus === 'REJECTED' ? '已退回' : '待认证'}` : ''}`}>
+                  {e.name}
+                </a>
+              ))}
+              {evCount > 3 && <span className="evidence-chip muted">+{evCount - 3}</span>}
+            </div>
+          )}
+          <div style={{ flex: 1 }} />
+          {onEdit && (
+            <button type="button" className="row-edit-btn" onClick={onEdit}>
+              <Pencil size={11} /> 编辑
+            </button>
+          )}
+          {onUploadEvidence && (
+            <button type="button" className="row-edit-btn" onClick={onUploadEvidence} title="上传到该阀点的佐证">
+              <Upload size={11} /> +佐证
+            </button>
+          )}
+        </footer>
+      )}
     </div>
   )
 }
 
-function ApprovalSection({ approvals }: { approvals: ApprovalRow[] }) {
+function ApprovalSection({ approvals, onEdit, onUploadEvidence, onPreviewEvidence }: {
+  approvals: ApprovalRow[]
+  onEdit: (row: ApprovalRow) => void
+  onUploadEvidence: (row: ApprovalRow, label: string) => void
+  onPreviewEvidence: (e: EvidenceAttachment) => void
+}) {
   if (!approvals.length) return null
   return (
     <section className="approval-progress">
@@ -418,6 +597,8 @@ function ApprovalSection({ approvals }: { approvals: ApprovalRow[] }) {
             <th className="date">实际批复</th>
             <th>状态</th>
             <th>备注</th>
+            <th>佐证</th>
+            <th className="action-col">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -441,6 +622,17 @@ function ApprovalSection({ approvals }: { approvals: ApprovalRow[] }) {
                   </span>
                 </td>
                 <td className="muted">{a.note || '—'}</td>
+                <td>
+                  <EvidenceChipList evidence={a.evidence} onPreview={onPreviewEvidence} />
+                </td>
+                <td>
+                  <button type="button" className="row-edit-btn" onClick={() => onEdit(a)}>
+                    <Pencil size={11} /> 编辑
+                  </button>
+                  <button type="button" className="row-edit-btn" onClick={() => onUploadEvidence(a, `审批 ${a.order} · ${a.name}`)}>
+                    <Upload size={11} /> +佐证
+                  </button>
+                </td>
               </tr>
             )
           })}
@@ -450,7 +642,12 @@ function ApprovalSection({ approvals }: { approvals: ApprovalRow[] }) {
   )
 }
 
-function CommissioningSection({ commissionings }: { commissionings: CommissioningRow[] }) {
+function CommissioningSection({ commissionings, onEdit, onUploadEvidence, onPreviewEvidence }: {
+  commissionings: CommissioningRow[]
+  onEdit: (row: CommissioningRow) => void
+  onUploadEvidence: (row: CommissioningRow, label: string) => void
+  onPreviewEvidence: (e: EvidenceAttachment) => void
+}) {
   if (!commissionings.length) return null
   return (
     <section className="commissioning-progress">
@@ -468,6 +665,8 @@ function CommissioningSection({ commissionings }: { commissionings: Commissionin
             <th>合格判定</th>
             <th className="date">验证日期</th>
             <th>备注</th>
+            <th>佐证</th>
+            <th className="action-col">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -494,6 +693,21 @@ function CommissioningSection({ commissionings }: { commissionings: Commissionin
                 </td>
                 <td className="date">{row?.verifiedAt ? fmtDate(row.verifiedAt) : '—'}</td>
                 <td className="muted">{row?.note || '—'}</td>
+                <td>
+                  <EvidenceChipList evidence={row?.evidence ?? []} onPreview={onPreviewEvidence} />
+                </td>
+                <td>
+                  {row && (
+                    <>
+                      <button type="button" className="row-edit-btn" onClick={() => onEdit(row)}>
+                        <Pencil size={11} /> 编辑
+                      </button>
+                      <button type="button" className="row-edit-btn" onClick={() => onUploadEvidence(row, `试车 ${tmpl.order} · ${tmpl.name}`)}>
+                        <Upload size={11} /> +佐证
+                      </button>
+                    </>
+                  )}
+                </td>
               </tr>
             )
           })}
@@ -503,7 +717,12 @@ function CommissioningSection({ commissionings }: { commissionings: Commissionin
   )
 }
 
-function RampSection({ ramps }: { ramps: RampRow[] }) {
+function RampSection({ ramps, onEdit, onUploadEvidence, onPreviewEvidence }: {
+  ramps: RampRow[]
+  onEdit: (row: RampRow) => void
+  onUploadEvidence: (row: RampRow, label: string) => void
+  onPreviewEvidence: (e: EvidenceAttachment) => void
+}) {
   if (!ramps.length) return null
   return (
     <section className="ramp-progress">
@@ -522,6 +741,8 @@ function RampSection({ ramps }: { ramps: RampRow[] }) {
             <th className="number">实际达成产能</th>
             <th>达标状态</th>
             <th>备注</th>
+            <th>佐证</th>
+            <th className="action-col">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -562,6 +783,21 @@ function RampSection({ ramps }: { ramps: RampRow[] }) {
                   </span>
                 </td>
                 <td className="muted">{row?.note || '—'}</td>
+                <td>
+                  <EvidenceChipList evidence={row?.evidence ?? []} onPreview={onPreviewEvidence} />
+                </td>
+                <td>
+                  {row && (
+                    <>
+                      <button type="button" className="row-edit-btn" onClick={() => onEdit(row)}>
+                        <Pencil size={11} /> 编辑
+                      </button>
+                      <button type="button" className="row-edit-btn" onClick={() => onUploadEvidence(row, `爬坡 · ${tmpl.phase} (${tmpl.loadRate}%)`)}>
+                        <Upload size={11} /> +佐证
+                      </button>
+                    </>
+                  )}
+                </td>
               </tr>
             )
           })}

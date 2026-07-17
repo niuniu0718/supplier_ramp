@@ -195,9 +195,10 @@ PLAN_ITEMS = [
     {"plan_id": "P001", "milestone_key": "EQUIPMENT_DELIVERY", "milestone_order": 5,
      "type": "里程碑", "name": "设备到货", "vendor": "江苏鹏飞",
      "order_no": "PF-2025-0312/0313", "expected_arrival": months_ago(1),
-     "actual_arrival": None, "status": "部分到货", "delay_days": 30,
+     "actual_arrival": None, "status": "已逾期", "delay_days": 30,
      "supplier_action": "回转窑 1# 已到货；2# 主体发货但配套电控柜排产中。",
-     "procurement_action": "催交配套件 + 协调电气安装班组待命 + 部分进度款支付。"},
+     "procurement_action": "催交配套件 + 协调电气安装班组待命 + 部分进度款支付。",
+     "note": "2# 窑炉配套电控柜预计延后 30 天，已影响 8 月初联动试车窗口。"},
     {"plan_id": "P001", "milestone_key": "INSTALLATION", "milestone_order": 6,
      "type": "里程碑", "name": "安装调试", "vendor": "江苏鹏飞",
      "order_no": "P001-INS-2026", "expected_arrival": months_ahead(2),
@@ -207,13 +208,13 @@ PLAN_ITEMS = [
     {"plan_id": "P001", "milestone_key": "TRIAL_PRODUCTION", "milestone_order": 7,
      "type": "里程碑", "name": "试生产", "vendor": "赣锋",
      "order_no": "P001-TP-2026", "expected_arrival": months_ahead(5),
-     "actual_arrival": None, "status": "待开始", "delay_days": 0,
+     "actual_arrival": None, "status": "未开始", "delay_days": 0,
      "supplier_action": "尚未开始。",
      "procurement_action": "工艺方案冻结 + 试生产原料准备。"},
     {"plan_id": "P001", "milestone_key": "FULL_PRODUCTION", "milestone_order": 8,
      "type": "里程碑", "name": "正式投产", "vendor": "赣锋",
      "order_no": "P001-FP-2026", "expected_arrival": months_ahead(6),
-     "actual_arrival": None, "status": "待开始", "delay_days": 0,
+     "actual_arrival": None, "status": "未开始", "delay_days": 0,
      "supplier_action": "尚未开始。",
      "procurement_action": "产能爬坡对账 + 量产验收。"},
 
@@ -245,9 +246,10 @@ PLAN_ITEMS = [
     {"plan_id": "P002", "milestone_key": "EQUIPMENT_DELIVERY", "milestone_order": 5,
      "type": "里程碑", "name": "设备到货", "vendor": "德国耐驰",
      "order_no": "NE-2026-001/002", "expected_arrival": months_ago(1),
-     "actual_arrival": None, "status": "部分到货", "delay_days": 25,
+     "actual_arrival": None, "status": "已逾期", "delay_days": 25,
      "supplier_action": "砂磨机 1# 已到场，2# 主机身到场 + 研磨介质海运中。",
-     "procurement_action": "每周对账催货 + 工艺验证排期 8 月第二周。"},
+     "procurement_action": "每周对账催货 + 工艺验证排期 8 月第二周。",
+     "note": "研磨介质海运延误，已要求供应商走空运补 5 吨应急库存。"},
     {"plan_id": "P002", "milestone_key": "INSTALLATION", "milestone_order": 6,
      "type": "里程碑", "name": "安装调试", "vendor": "德国耐驰",
      "order_no": "P002-INS-2026", "expected_arrival": months_ahead(1),
@@ -257,13 +259,13 @@ PLAN_ITEMS = [
     {"plan_id": "P002", "milestone_key": "TRIAL_PRODUCTION", "milestone_order": 7,
      "type": "里程碑", "name": "试生产", "vendor": "裕能",
      "order_no": "P002-TP-2026", "expected_arrival": months_ahead(2),
-     "actual_arrival": None, "status": "待开始", "delay_days": 0,
+     "actual_arrival": None, "status": "未开始", "delay_days": 0,
      "supplier_action": "尚未开始。",
      "procurement_action": "试生产原料 + 工艺规程准备。"},
     {"plan_id": "P002", "milestone_key": "FULL_PRODUCTION", "milestone_order": 8,
      "type": "里程碑", "name": "正式投产", "vendor": "裕能",
      "order_no": "P002-FP-2026", "expected_arrival": months_ahead(3),
-     "actual_arrival": None, "status": "待开始", "delay_days": 0,
+     "actual_arrival": None, "status": "未开始", "delay_days": 0,
      "supplier_action": "尚未开始。",
      "procurement_action": "量产爬坡对账。"},
 
@@ -295,25 +297,25 @@ PLAN_ITEMS = [
     {"plan_id": "P003", "milestone_key": "EQUIPMENT_DELIVERY", "milestone_order": 5,
      "type": "里程碑", "name": "设备到货", "vendor": "苏州博华",
      "order_no": "BH-2026-008", "expected_arrival": months_ahead(2),
-     "actual_arrival": None, "status": "已签", "delay_days": 0,
+     "actual_arrival": None, "status": "未开始", "delay_days": 0,
      "supplier_action": "技术协议确认后进入制造阶段，预计 9 月中旬发货。",
      "procurement_action": "跟踪制造进度 + 安装场地准备。"},
     {"plan_id": "P003", "milestone_key": "INSTALLATION", "milestone_order": 6,
      "type": "里程碑", "name": "安装调试", "vendor": "苏州博华",
      "order_no": "P003-INS-2026", "expected_arrival": months_ahead(3),
-     "actual_arrival": None, "status": "待开始", "delay_days": 0,
+     "actual_arrival": None, "status": "未开始", "delay_days": 0,
      "supplier_action": "尚未开始。",
      "procurement_action": "安装方案 + 监理排期。"},
     {"plan_id": "P003", "milestone_key": "TRIAL_PRODUCTION", "milestone_order": 7,
      "type": "里程碑", "name": "试生产", "vendor": "容百",
      "order_no": "P003-TP-2026", "expected_arrival": months_ahead(4),
-     "actual_arrival": None, "status": "待开始", "delay_days": 0,
+     "actual_arrival": None, "status": "未开始", "delay_days": 0,
      "supplier_action": "尚未开始。",
      "procurement_action": "尚未约定。"},
     {"plan_id": "P003", "milestone_key": "FULL_PRODUCTION", "milestone_order": 8,
      "type": "里程碑", "name": "正式投产", "vendor": "容百",
      "order_no": "P003-FP-2026", "expected_arrival": months_ahead(5),
-     "actual_arrival": None, "status": "待开始", "delay_days": 0,
+     "actual_arrival": None, "status": "未开始", "delay_days": 0,
      "supplier_action": "尚未开始。",
      "procurement_action": "尚未约定。"},
 
@@ -395,25 +397,25 @@ PLAN_ITEMS = [
     {"plan_id": "P005", "milestone_key": "EQUIPMENT_DELIVERY", "milestone_order": 5,
      "type": "里程碑", "name": "设备到货", "vendor": "江苏乐科",
      "order_no": "LK-2026-001", "expected_arrival": months_ahead(4),
-     "actual_arrival": None, "status": "已签", "delay_days": 0,
+     "actual_arrival": None, "status": "未开始", "delay_days": 0,
      "supplier_action": "图纸会签后 60 天出厂，分体发运至焦作。",
      "procurement_action": "技术协议细化 + 工艺管线对接方案评审。"},
     {"plan_id": "P005", "milestone_key": "INSTALLATION", "milestone_order": 6,
      "type": "里程碑", "name": "安装调试", "vendor": "江苏乐科",
      "order_no": "P005-INS-2026", "expected_arrival": months_ahead(6),
-     "actual_arrival": None, "status": "待开始", "delay_days": 0,
+     "actual_arrival": None, "status": "未开始", "delay_days": 0,
      "supplier_action": "尚未开始。",
      "procurement_action": "尚未约定。"},
     {"plan_id": "P005", "milestone_key": "TRIAL_PRODUCTION", "milestone_order": 7,
      "type": "里程碑", "name": "试生产", "vendor": "多氟多",
      "order_no": "P005-TP-2027", "expected_arrival": months_ahead(9),
-     "actual_arrival": None, "status": "待开始", "delay_days": 0,
+     "actual_arrival": None, "status": "未开始", "delay_days": 0,
      "supplier_action": "尚未开始。",
      "procurement_action": "尚未约定。"},
     {"plan_id": "P005", "milestone_key": "FULL_PRODUCTION", "milestone_order": 8,
      "type": "里程碑", "name": "正式投产", "vendor": "多氟多",
      "order_no": "P005-FP-2027", "expected_arrival": months_ahead(11),
-     "actual_arrival": None, "status": "待开始", "delay_days": 0,
+     "actual_arrival": None, "status": "未开始", "delay_days": 0,
      "supplier_action": "尚未开始。",
      "procurement_action": "尚未约定。"},
 ]
@@ -617,45 +619,141 @@ def seed(db: Session) -> None:
 
     for it in PLAN_ITEMS:
         db.add(ExpansionItem(**it))
+    db.flush()
 
     for a in APPROVALS:
         db.add(Approval(**a))
+    db.flush()
 
     for c in COMMISSIONINGS:
         db.add(CommissioningItem(**c))
+    db.flush()
 
     for r in RAMPS:
         db.add(RampItem(**r))
+    db.flush()
 
     from app.models.expansion import EvidenceChain
+    # 演示用：3 条由供应商上传的佐证需要再认证，1 条已被退回，1 条已通过
     evidence_rows = [
-        {"plan_id": "P001", "category": "DEVICE_PHOTO", "file_name": "窑炉1号到货验收.jpg",
+        # 采购员上传（admin）— 不需再认证
+        {"plan_id": "P001", "name": "回转窑 1# 到货验收现场", "file_name": "窑炉1号到货验收.jpg",
          "stored_name": "kiln1.jpg", "mime_type": "image/jpeg", "size": 350_000,
          "url": "/uploads/kiln1.jpg", "note": "回转窑 1# 到货验收现场", "uploaded_by_id": "admin",
-         "uploaded_at": days_ago(8)},
-        {"plan_id": "P001", "category": "CONTRACT", "file_name": "鹏飞采购合同.pdf",
+         "uploaded_by_role": "PROCUREMENT", "requires_verification": False,
+         "verification_status": "VERIFIED", "uploaded_at": days_ago(8)},
+        # 供应商上传（赣锋）— 需要再认证
+        {"plan_id": "P001", "name": "江苏鹏飞采购合同正本", "file_name": "鹏飞采购合同.pdf",
          "stored_name": "pf-contract.pdf", "mime_type": "application/pdf", "size": 540_000,
-         "url": "/uploads/pf-contract.pdf", "note": "江苏鹏飞采购合同正本", "uploaded_by_id": "admin",
-         "uploaded_at": months_ago(3)},
-        {"plan_id": "P002", "category": "PAYMENT", "file_name": "耐驰设备付款凭证.pdf",
+         "url": "/uploads/pf-contract.pdf", "note": "供应商赣锋上传的采购合同，需采购经理确认",
+         "uploaded_by_id": "S_GANFENG", "uploaded_by_role": "SUPPLIER", "requires_verification": True,
+         "verification_status": "PENDING", "uploaded_at": months_ago(3)},
+        # 采购员上传（admin）
+        {"plan_id": "P002", "name": "砂磨机 1# 尾款付款凭证", "file_name": "耐驰设备付款凭证.pdf",
          "stored_name": "netzsch-pay.pdf", "mime_type": "application/pdf", "size": 210_000,
          "url": "/uploads/netzsch-pay.pdf", "note": "砂磨机 1# 尾款付款凭证", "uploaded_by_id": "admin",
-         "uploaded_at": months_ago(1)},
-        {"plan_id": "P002", "category": "TEST_REPORT", "file_name": "工艺验证报告v2.pdf",
+         "uploaded_by_role": "PROCUREMENT", "requires_verification": False,
+         "verification_status": "VERIFIED", "uploaded_at": months_ago(1)},
+        # 供应商上传（裕能）— 已被退回
+        {"plan_id": "P002", "name": "LFP 工艺验证报告 v2（退回）", "file_name": "工艺验证报告v2.pdf",
          "stored_name": "lfp-validation.pdf", "mime_type": "application/pdf", "size": 800_000,
-         "url": "/uploads/lfp-validation.pdf", "note": "LFP 工艺验证第二轮报告", "uploaded_by_id": "admin",
-         "uploaded_at": months_ago(1)},
-        {"plan_id": "P004", "category": "SITE_PHOTO", "file_name": "云南石墨化炉现场.jpg",
+         "url": "/uploads/lfp-validation.pdf", "note": "供应商上传的报告数据不完整，已退回补正",
+         "uploaded_by_id": "S_YUNENG", "uploaded_by_role": "SUPPLIER", "requires_verification": True,
+         "verification_status": "REJECTED", "verified_by_id": "admin",
+         "verified_at": days_ago(3), "verified_note": "缺 24h 连续运行数据，请补正后重新提交",
+         "uploaded_at": days_ago(7)},
+        # 采购员上传（admin）
+        {"plan_id": "P004", "name": "石墨化炉 1# 投产现场", "file_name": "云南石墨化炉现场.jpg",
          "stored_name": "graphitization.jpg", "mime_type": "image/jpeg", "size": 420_000,
          "url": "/uploads/graphitization.jpg", "note": "石墨化炉 1# 投产现场", "uploaded_by_id": "admin",
-         "uploaded_at": months_ago(2)},
-        {"plan_id": "P005", "category": "CONTRACT", "file_name": "江苏乐科采购合同.pdf",
+         "uploaded_by_role": "PROCUREMENT", "requires_verification": False,
+         "verification_status": "VERIFIED", "uploaded_at": months_ago(2)},
+        # 供应商上传（多多）— 待认证
+        {"plan_id": "P005", "name": "江苏乐科反应釜采购合同", "file_name": "江苏乐科采购合同.pdf",
          "stored_name": "lk-contract.pdf", "mime_type": "application/pdf", "size": 380_000,
-         "url": "/uploads/lk-contract.pdf", "note": "反应釜采购合同", "uploaded_by_id": "admin",
-         "uploaded_at": months_ago(1)},
+         "url": "/uploads/lk-contract.pdf", "note": "供应商多氟多上传的合同正本，待采购经理确认",
+         "uploaded_by_id": "S_DUOFUDUO", "uploaded_by_role": "SUPPLIER", "requires_verification": True,
+         "verification_status": "PENDING", "uploaded_at": days_ago(2)},
     ]
     # fix syntax typo
     for row in evidence_rows:
+        db.add(EvidenceChain(**row))
+
+    # 添加节点级证据（示范按 target_kind + target_id 归档）：从已建好的扩展节点取 id
+    from app.models.expansion import Approval as ApprovalModelAlias
+
+    def first_item(plan_id: str, milestone_key: str):
+        return db.query(ExpansionItem).filter(
+            ExpansionItem.plan_id == plan_id,
+            ExpansionItem.milestone_key == milestone_key,
+        ).first()
+
+    def first_approval(plan_id: str, key: str):
+        return db.query(ApprovalModelAlias).filter(
+            ApprovalModelAlias.plan_id == plan_id, ApprovalModelAlias.type == key,
+        ).first()
+
+    def first_commissioning(plan_id: str, key: str):
+        return db.query(CommissioningItem).filter(
+            CommissioningItem.plan_id == plan_id, CommissioningItem.type == key,
+        ).first()
+
+    def first_ramp(plan_id: str, phase: str):
+        return db.query(RampItem).filter(
+            RampItem.plan_id == plan_id, RampItem.phase == phase,
+        ).first()
+
+    node_evidence = []
+    p4_pf = first_item("P004", "EQUIPMENT_DELIVERY")
+    if p4_pf:
+        node_evidence.append({
+            "plan_id": "P004", "target_kind": "item", "target_id": p4_pf.id,
+            "name": "云南石墨化炉吊装现场", "file_name": "云南石墨化炉吊装现场.jpg",
+            "stored_name": "graphite-install.jpg", "mime_type": "image/jpeg", "size": 510_000,
+            "url": "/uploads/graphite-install.jpg", "note": "云南 4 期 阀点 5 · 设备到货",
+            "uploaded_by_id": "admin", "uploaded_by_role": "PROCUREMENT",
+            "requires_verification": False, "verification_status": "VERIFIED",
+            "uploaded_at": days_ago(2),
+        })
+    p4_appr = first_approval("P004", "HAZMAT_PRODUCTION")
+    if p4_appr:
+        node_evidence.append({
+            "plan_id": "P004", "target_kind": "approval", "target_id": p4_appr.id,
+            "name": "云南应急局危化品批复函", "file_name": "云南应急局危化品批复函.pdf",
+            "stored_name": "hazmat-approval.pdf", "mime_type": "application/pdf", "size": 290_000,
+            "url": "/uploads/hazmat-approval.pdf",
+            "note": "云南应急管理局危险化学品生产许可批复函",
+            "uploaded_by_id": "admin", "uploaded_by_role": "PROCUREMENT",
+            "requires_verification": False, "verification_status": "VERIFIED",
+            "uploaded_at": months_ago(2),
+        })
+    p2_comm = first_commissioning("P002", "PRODUCT_QUALITY")
+    if p2_comm:
+        # 供应商上传的试车不合格报告 — 待采购经理认证
+        node_evidence.append({
+            "plan_id": "P002", "target_kind": "commissioning", "target_id": p2_comm.id,
+            "name": "LFP 产品质量不合格报告", "file_name": "LFP-产品质量不合格报告.pdf",
+            "stored_name": "lfp-quality-fail.pdf", "mime_type": "application/pdf", "size": 700_000,
+            "url": "/uploads/lfp-quality-fail.pdf",
+            "note": "供应商上传的产品质量不合格记录，需采购经理确认后启动整改",
+            "uploaded_by_id": "S_YUNENG", "uploaded_by_role": "SUPPLIER",
+            "requires_verification": True, "verification_status": "PENDING",
+            "uploaded_at": days_ago(5),
+        })
+    p4_phase4 = first_ramp("P004", "Phase4")
+    if p4_phase4:
+        node_evidence.append({
+            "plan_id": "P004", "target_kind": "ramp", "target_id": p4_phase4.id,
+            "name": "云南全产能达成月报", "file_name": "云南全产能达成月报.pdf",
+            "stored_name": "phase4-monthly.pdf", "mime_type": "application/pdf", "size": 320_000,
+            "url": "/uploads/phase4-monthly.pdf", "note": "Phase4 全负荷月度达成报告",
+            "uploaded_by_id": "admin", "uploaded_by_role": "PROCUREMENT",
+            "requires_verification": False, "verification_status": "VERIFIED",
+            "uploaded_at": days_ago(15),
+        })
+
+    print(f"[seed] node_evidence has {len(node_evidence)} rows to insert")
+    for row in node_evidence:
         db.add(EvidenceChain(**row))
 
     db.commit()

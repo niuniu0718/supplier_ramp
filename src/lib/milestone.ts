@@ -36,14 +36,11 @@ export const MILESTONE_STATUS_META: Record<
   string,
   { label: string; color: string; bg: string; ring: string; tone: 'done' | 'progress' | 'pending' | 'overdue' }
 > = {
-  已投产: { label: '已投产', color: 'var(--green)', bg: '#e6f8f1', ring: '#18a875', tone: 'done' },
-  已调试: { label: '已调试', color: 'var(--green)', bg: '#e6f8f1', ring: '#18a875', tone: 'done' },
   已完成: { label: '已完成', color: 'var(--green)', bg: '#e6f8f1', ring: '#18a875', tone: 'done' },
-  已到货: { label: '已到货', color: 'var(--green)', bg: '#e6f8f1', ring: '#18a875', tone: 'done' },
   进行中: { label: '进行中', color: 'var(--orange)', bg: '#fff0e3', ring: '#ef7d32', tone: 'progress' },
-  部分到货: { label: '部分到货', color: 'var(--orange)', bg: '#fff0e3', ring: '#ef7d32', tone: 'progress' },
-  已签: { label: '已签合同', color: 'var(--primary)', bg: '#e0eaff', ring: '#2563eb', tone: 'pending' },
-  待开始: { label: '待开始', color: 'var(--text-muted)', bg: '#eef2f7', ring: '#9ca3af', tone: 'pending' },
+  未开始: { label: '未开始', color: 'var(--text-muted)', bg: '#eef2f7', ring: '#9ca3af', tone: 'pending' },
+  待开始: { label: '未开始', color: 'var(--text-muted)', bg: '#eef2f7', ring: '#9ca3af', tone: 'pending' },
+  已逾期: { label: '已逾期', color: 'var(--red)', bg: '#ffe4e0', ring: '#dc3f4c', tone: 'overdue' },
 }
 
 export function milestoneStatusMeta(status: string) {
