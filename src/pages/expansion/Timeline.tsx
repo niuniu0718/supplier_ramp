@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, Paperclip, Pencil, Upload, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Paperclip, Pencil, Plus, Trash2, Upload, type LucideIcon } from 'lucide-react'
 import { BoardShell } from '../../components/layout/BoardShell'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { ErrorState, LoadingState } from '../../components/ui/States'
 import { PlanEditModal } from '../../components/expansion/PlanEditModal'
+import { PlanCreateModal } from '../../components/expansion/PlanCreateModal'
 import { MilestoneEditModal } from '../../components/expansion/MilestoneEditModal'
 import { EvidenceChipList } from '../../components/expansion/EvidenceChipList'
+import { Modal } from '../../components/ui/Modal'
 import { EvidencePreviewModal } from '../../components/expansion/EvidencePreviewModal'
 import { ApprovalEditModal } from '../../components/expansion/ApprovalEditModal'
 import { CommissioningEditModal } from '../../components/expansion/CommissioningEditModal'
@@ -75,6 +77,10 @@ export function ExpansionTimeline() {
   const [data, setData] = useState<ExpansionTimelinePayload | null>(null)
   const [error, setError] = useState('')
   const [editingPlan, setEditingPlan] = useState<ExpansionTimelineRow | null>(null)
+  const [creatingPlan, setCreatingPlan] = useState(false)
+  const [deletingPlan, setDeletingPlan] = useState<ExpansionTimelineRow | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [uploadingAt, setUploadingAt] = useState<EvidenceTarget | null>(null)
   const [editingItem, setEditingItem] = useState<ExpansionMilestoneItem | null>(null)
   const [editingApproval, setEditingApproval] = useState<ApprovalRow | null>(null)
@@ -84,6 +90,21 @@ export function ExpansionTimeline() {
 
   function reload() {
     return api.get<ExpansionTimelinePayload>('/api/boards/expansion/views/timeline').then(setData)
+  }
+
+  async function confirmDelete() {
+    if (!deletingPlan) return
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      await api.delete(`/api/expansion-plans/${deletingPlan.id}`)
+      setDeletingPlan(null)
+      await reload()
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : '删除失败。')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   useEffect(() => {
@@ -151,6 +172,11 @@ export function ExpansionTimeline() {
       title="里程碑时间轴"
       description="8 个标准阀点 · 5 个扩产计划横向对比 · 供应商/采购双侧明细"
       views={VIEWS}
+      rightSlot={
+        <button type="button" className="button button-primary" onClick={() => setCreatingPlan(true)}>
+          <Plus size={14} /> 新增扩产计划
+        </button>
+      }
       kpis={[
         ...data.kpis.map((k, i) => <KpiCard key={i} kpi={k} />),
         <KpiCard
@@ -327,6 +353,14 @@ export function ExpansionTimeline() {
                 <button type="button" className="text-button" onClick={() => setUploadingAt({ kind: 'plan', planId: row.id, planName: row.name })}>
                   <Upload size={12} /> 上传佐证
                 </button>
+                <button
+                  type="button"
+                  className="text-button text-button-danger"
+                  onClick={() => { setDeleteError(''); setDeletingPlan(row) }}
+                  title="删除该扩产计划（含其所有子节点）"
+                >
+                  <Trash2 size={12} /> 删除
+                </button>
                 <StatusBadge status={row.status} short />
               </div>
             </header>
@@ -457,6 +491,32 @@ export function ExpansionTimeline() {
           evidence={previewEvidence}
           onClose={() => setPreviewEvidence(null)}
         />
+      )}
+      {creatingPlan && (
+        <PlanCreateModal onClose={() => setCreatingPlan(false)} onCreated={reload} />
+      )}
+      {deletingPlan && (
+        <Modal
+          title={`删除扩产计划 · ${deletingPlan.name}`}
+          onClose={() => { if (!deleting) setDeletingPlan(null) }}
+          width={460}
+          footer={
+            <>
+              <button className="button button-secondary" onClick={() => setDeletingPlan(null)} disabled={deleting}>取消</button>
+              <button className="button button-danger" onClick={confirmDelete} disabled={deleting}>
+                {deleting ? '删除中…' : '确认删除'}
+              </button>
+            </>
+          }
+        >
+          {deleteError && <p className="form-error">{deleteError}</p>}
+          <p>确定要删除扩产计划「{deletingPlan.name}」吗？</p>
+          <ul className="plan-delete-list muted">
+            <li>该计划下的 8 个里程碑阀点、6 项审批、6 项试车验证、4 阶段爬坡记录将一并删除</li>
+            <li>所有已上传的佐证文件也会被清理</li>
+            <li>此操作不可恢复，请谨慎</li>
+          </ul>
+        </Modal>
       )}
     </BoardShell>
   )

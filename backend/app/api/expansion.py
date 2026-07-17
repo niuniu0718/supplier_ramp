@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -11,12 +11,12 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
 from ..db import get_db
-from ..models import Approval, CommissioningItem, ExpansionItem, ExpansionPlan, EvidenceChain, RampItem
+from ..models import Approval, CommissioningItem, ExpansionItem, ExpansionPlan, EvidenceChain, Material, RampItem, Supplier
 from ..security import require_session
-from ..services.approval_types import APPROVAL_BY_KEY
-from ..services.commissioning_types import COMMISSIONING_BY_KEY
-from ..services.ramp_phases import RAMP_BY_PHASE
-from ..services.milestone_template import milestone_name
+from ..services.approval_types import APPROVAL_BY_KEY, APPROVAL_TYPES
+from ..services.commissioning_types import COMMISSIONING_BY_KEY, COMMISSIONING_TYPES
+from ..services.ramp_phases import RAMP_BY_PHASE, RAMP_PHASES
+from ..services.milestone_template import MILESTONE_TEMPLATE, milestone_name
 from ..services.risk_engine import (
     calculate_expansion_risk,
     calculate_actual_progress,
@@ -698,3 +698,225 @@ def verify_evidence(
     db.commit()
     db.refresh(e)
     return {"evidence": _enrich_evidence(e)}
+
+
+def _parse_iso_date(value) -> datetime | None:
+    if not value:
+        return None
+    cleaned = str(value).replace("Z", "").strip()
+    try:
+        return datetime.fromisoformat(cleaned)
+    except ValueError:
+        try:
+            return datetime.strptime(cleaned, "%Y-%m-%d")
+        except ValueError:
+            return None
+
+
+def _build_milestone_dates(start: datetime, end: datetime) -> List[datetime]:
+    """把 8 个阀点按时间均匀分布在 [start, end] 内。"""
+    if end <= start:
+        return [start] * len(MILESTONE_TEMPLATE)
+    span = (end - start).total_seconds()
+    n = len(MILESTONE_TEMPLATE)
+    return [start + timedelta(seconds=span * (i + 1) / (n + 1)) for i in range(n)]
+
+
+def _build_approval_expected_dates(start: datetime, end: datetime) -> List[datetime]:
+    """6 项审批按与里程碑相近的节奏排布在前 2/3 时段。"""
+    if end <= start:
+        return [start] * len(APPROVAL_TYPES)
+    span = (end - start).total_seconds()
+    # 审批集中在前 2/3 时段（环评最先，建设用地最后）
+    return [start + timedelta(seconds=span * (i + 1) / (len(APPROVAL_TYPES) + 2)) for i in range(len(APPROVAL_TYPES))]
+
+
+def _build_ramp_confirmed_dates(start: datetime, end: datetime) -> List[datetime]:
+    """4 阶段爬坡均分在最后 1/3 时段。"""
+    if end <= start:
+        return [start] * len(RAMP_PHASES)
+    span = (end - start).total_seconds()
+    base = start + timedelta(seconds=span * 2 / 3)
+    return [base + timedelta(seconds=span * (i + 1) / (3 * (len(RAMP_PHASES) + 1))) for i in range(len(RAMP_PHASES))]
+
+
+def _build_commissioning_dates(start: datetime, end: datetime) -> List[datetime]:
+    """6 项试车验证按里程碑节奏，前 5 项在最后 1/3 时段起点之后。"""
+    if end <= start:
+        return [start] * len(COMMISSIONING_TYPES)
+    span = (end - start).total_seconds()
+    base = start + timedelta(seconds=span * 5 / 6)
+    return [base + timedelta(seconds=span * (i + 1) / (6 * (len(COMMISSIONING_TYPES) + 1))) for i in range(len(COMMISSIONING_TYPES))]
+
+
+@router.get("/expansion-meta")
+def expansion_meta(
+    db: Session = Depends(get_db),
+    _: str = Depends(require_session),
+):
+    """供前端「新增扩产计划」表单使用的元数据（供应商 / 物料 / 模板）。"""
+    suppliers = db.query(Supplier).order_by(Supplier.id.asc()).all()
+    materials = db.query(Material).order_by(Material.id.asc()).all()
+    return {
+        "suppliers": [
+            {"id": s.id, "shortName": s.short_name, "name": s.name, "category": s.category}
+            for s in suppliers
+        ],
+        "materials": [
+            {
+                "id": m.id, "name": m.name, "type": m.type,
+                "supplierId": m.supplier_id, "demandMonthly": m.demand_monthly,
+            }
+            for m in materials
+        ],
+        "milestoneTemplate": [
+            {"order": m["order"], "key": m["key"], "name": m["name"]}
+            for m in MILESTONE_TEMPLATE
+        ],
+        "approvalTemplate": APPROVAL_TYPES,
+        "commissioningTemplate": COMMISSIONING_TYPES,
+        "rampTemplate": RAMP_PHASES,
+    }
+
+
+@router.post("/expansion-plans")
+def create_plan(
+    body: dict,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_session),
+):
+    """创建扩产计划，可同时按模板生成 4 个 L2 子模块的子节点。"""
+    material_id = body.get("materialId") or body.get("material_id")
+    supplier_id = body.get("supplierId") or body.get("supplier_id")
+    name = (body.get("name") or "").strip()
+    start_date = _parse_iso_date(body.get("startDate") or body.get("start_date"))
+    end_date = _parse_iso_date(body.get("endDate") or body.get("end_date"))
+    if not (material_id and supplier_id and name and start_date and end_date):
+        raise HTTPException(status_code=400, detail="请填写物料、供应商、计划名称、起止日期。")
+    if end_date <= start_date:
+        raise HTTPException(status_code=400, detail="结束日期必须晚于开始日期。")
+    if not db.get(Material, material_id):
+        raise HTTPException(status_code=400, detail="物料不存在。")
+    if not db.get(Supplier, supplier_id):
+        raise HTTPException(status_code=400, detail="供应商不存在。")
+
+    target_capacity = float(body.get("targetCapacity") or body.get("target_capacity") or 0)
+    invested_capex = float(body.get("investedCapex") or body.get("invested_capex") or 0)
+    total_capex = float(body.get("totalCapex") or body.get("total_capex") or 0)
+    funding_sources = body.get("fundingSources") or body.get("funding_sources") or []
+    stage = body.get("stage") or "立项"
+    status = body.get("status") or None
+    risk_types = body.get("riskTypes") or body.get("risk_types") or []
+    risk_description = body.get("riskDescription") or body.get("risk_description") or ""
+
+    # 4 个子模块生成开关，默认全部生成
+    generate = body.get("generate") or {}
+    gen_items = generate.get("items", True)
+    gen_approvals = generate.get("approvals", True)
+    gen_commissionings = generate.get("commissionings", True)
+    gen_ramps = generate.get("ramps", True)
+
+    new_id = f"P{uuid.uuid4().hex[:6].upper()}"
+    while db.get(ExpansionPlan, new_id):
+        new_id = f"P{uuid.uuid4().hex[:6].upper()}"
+
+    plan = ExpansionPlan(
+        id=new_id,
+        material_id=material_id,
+        supplier_id=supplier_id,
+        name=name,
+        start_date=start_date,
+        end_date=end_date,
+        target_capacity=target_capacity,
+        invested_capex=invested_capex,
+        total_capex=total_capex,
+        funding_sources=funding_sources,
+        stage=stage,
+        progress=0,
+        expected_progress=0,
+        status=status,
+        risk_types=risk_types,
+        risk_description=risk_description,
+        owner_id="admin",
+    )
+    db.add(plan)
+    db.flush()
+
+    if gen_items:
+        dates = _build_milestone_dates(start_date, end_date)
+        for tmpl, dt in zip(MILESTONE_TEMPLATE, dates):
+            db.add(ExpansionItem(
+                plan_id=new_id,
+                type="里程碑",
+                name=tmpl["name"],
+                vendor="",
+                order_no="",
+                expected_arrival=dt,
+                actual_arrival=None,
+                status="未开始",
+                delay_days=0,
+                note="",
+                supplier_action="",
+                procurement_action="",
+                milestone_key=tmpl["key"],
+                milestone_order=tmpl["order"],
+            ))
+
+    if gen_approvals:
+        dates = _build_approval_expected_dates(start_date, end_date)
+        for tmpl, dt in zip(APPROVAL_TYPES, dates):
+            db.add(Approval(
+                plan_id=new_id,
+                type=tmpl["key"],
+                submitted_at=None,
+                expected_at=dt,
+                actual_at=None,
+                note="",
+            ))
+
+    if gen_commissionings:
+        dates = _build_commissioning_dates(start_date, end_date)
+        for tmpl, dt in zip(COMMISSIONING_TYPES, dates):
+            db.add(CommissioningItem(
+                plan_id=new_id,
+                type=tmpl["key"],
+                target_value=tmpl.get("standard", ""),
+                actual_value="",
+                pass_status="PENDING",
+                verified_at=None,
+                note="",
+            ))
+
+    if gen_ramps:
+        dates = _build_ramp_confirmed_dates(start_date, end_date)
+        for tmpl, dt in zip(RAMP_PHASES, dates):
+            db.add(RampItem(
+                plan_id=new_id,
+                phase=tmpl["phase"],
+                target_load_rate=tmpl["loadRate"],
+                target_capacity=target_capacity * tmpl["loadRate"] / 100,
+                planned_period=tmpl["period"],
+                confirmed_at=dt,
+                actual_capacity=None,
+                status="PENDING",
+                note="",
+            ))
+
+    db.commit()
+    db.refresh(plan)
+    return {"plan": _enrich_plan(plan)}
+
+
+@router.delete("/expansion-plans/{plan_id}")
+def delete_plan(
+    plan_id: str,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_session),
+):
+    """删除扩产计划，子表通过 ondelete=CASCADE 自动级联清理。"""
+    plan = db.get(ExpansionPlan, plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="计划不存在。")
+    db.delete(plan)
+    db.commit()
+    return {"ok": True, "planId": plan_id}

@@ -102,6 +102,8 @@ export interface ExpansionTimelineRow {
   riskDescription?: string
   itemCount: number
   overdueCount: number
+  completedItemCount?: number
+  totalItemCount?: number
   approvals: ApprovalRow[]
   commissionings: CommissioningRow[]
   ramps: RampRow[]

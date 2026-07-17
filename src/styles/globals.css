@@ -1539,3 +1539,68 @@ a { color: inherit; }
 .evidence-item h4 a:hover { text-decoration: underline; }
 .evidence-item small { color: var(--text-muted); font-size: 12px; display: block; }
 
+/* PlanCreateModal — 模板生成勾选 */
+.plan-create-template {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px 14px 12px;
+  margin: 6px 0 0;
+  background: var(--surface-muted);
+}
+.plan-create-template legend {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0 6px;
+}
+.plan-create-template-hint {
+  font-size: 11px;
+  margin: 0 0 8px;
+}
+.plan-create-template-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+.plan-create-template-row input[type="checkbox"] {
+  margin: 2px 0 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.plan-create-template-row strong { font-weight: 600; color: var(--text); }
+.plan-create-template-row code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+  color: var(--text-muted);
+}
+
+/* 删除确认 modal */
+.text-button-danger {
+  color: var(--red);
+  border-color: rgba(220, 63, 76, 0.3);
+}
+.text-button-danger:hover {
+  background: rgba(220, 63, 76, 0.08);
+  border-color: rgba(220, 63, 76, 0.45);
+}
+.plan-delete-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.board-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
