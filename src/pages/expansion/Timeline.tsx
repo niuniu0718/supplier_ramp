@@ -694,11 +694,6 @@ function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUplo
         >
           {pillMeta.label}
         </span>
-        {upgraded && (
-          <span className="upgraded-tag" title={`已升级为风险记录 · 最近更新 ${upgradeDate(upgradedRisk)}`}>
-            <AlertTriangle size={11} /> 已升级 {upgradeDate(upgradedRisk)}
-          </span>
-        )}
       </header>
       <div className="milestone-card-dates">
         <div>
