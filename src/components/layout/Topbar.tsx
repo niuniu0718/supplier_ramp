@@ -72,7 +72,7 @@ export function Topbar() {
           )}
         </div>
 
-        <div className="dropdown">
+        <div className="user-logout-row">
           <div className="topbar-user">
             <span className="avatar" style={{ background: '#2563eb' }}>
               <UserCircle2 size={18} color="#fff" />

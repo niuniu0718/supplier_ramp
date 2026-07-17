@@ -327,10 +327,12 @@ def expansion_timeline(
             if key not in risk_by_source:
                 risk_by_source[key] = {
                     "id": r.id,
+                    "type": r.type,
                     "level": r.level,
                     "status": r.status,
                     "closedAt": r.closed_at.isoformat() if r.closed_at else None,
                     "discoveredAt": r.discovered_at.isoformat() if r.discovered_at else None,
+                    "updatedAt": r.updated_at.isoformat() if r.updated_at else None,
                 }
     for p in plans:
         actual = calculate_actual_progress(p.items)

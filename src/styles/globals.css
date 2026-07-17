@@ -150,6 +150,12 @@ a { color: inherit; }
 .user-meta strong { display: block; font-size: 13px; }
 .user-meta small { color: var(--text-muted); font-size: 11px; }
 
+.user-logout-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .dropdown { position: relative; }
 .dropdown-panel {
   position: absolute;
@@ -1610,6 +1616,19 @@ a { color: inherit; }
 }
 
 .board-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.board-tabs-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  justify-content: space-between;
+}
+.board-tabs-row .view-tabs { flex: 1; }
+.board-tabs-actions {
   display: flex;
   align-items: center;
   gap: 10px;

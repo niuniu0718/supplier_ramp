@@ -41,10 +41,12 @@ export interface PendingRiskSignal {
 
 export interface UpgradedRiskRef {
   id: string
+  type: RiskTypeKey | string
   level: RiskLevel
   status: string
   closedAt: string | null
   discoveredAt: string | null
+  updatedAt: string | null
 }
 
 export type Role = 'PROCUREMENT_MANAGER' | 'PROCUREMENT_ENGINEER' | 'DEPARTMENT_LEADER' | 'SUPPLIER'

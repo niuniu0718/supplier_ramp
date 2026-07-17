@@ -71,6 +71,21 @@ function fmtYM(iso: string | null) {
   return `${yy}/${mm}/${dd}`
 }
 
+function fmtYMD(iso: string | null | undefined) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const yy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
+}
+
+// "最近一次升级时间"：优先 updatedAt（每次保存更新都会刷新），没有则回退 discoveredAt
+function upgradeDate(ref: UpgradedRiskRef | null | undefined): string {
+  if (!ref) return ''
+  return fmtYMD(ref.updatedAt || ref.discoveredAt)
+}
+
 type EvidenceTarget =
   | { kind: 'plan'; planId: string; planName: string }
   | { kind: 'item'; planId: string; planName: string; targetId: number; targetLabel: string }
@@ -87,6 +102,18 @@ type UpgradeTarget = {
   sourceLabel: string
   signal: PendingRiskSignal
   existing: UpgradedRiskRef | null
+}
+
+// 当节点没有 pendingSignal 但已经有 upgradedRisk 时（如状态已修复），
+// 仍要能打开升级弹窗。用已有风险的 type/level 合成一个最小 signal，
+// 让弹窗能正常提交（upsert 不会改动 type，只改 level/description/scope）。
+function signalFromExisting(ref: UpgradedRiskRef): PendingRiskSignal {
+  return {
+    type: ref.type as PendingRiskSignal['type'],
+    level: ref.level,
+    delayDays: 0,
+    reason: '（节点状态已变更，继续编辑该风险）',
+  }
 }
 
 export function ExpansionTimeline() {
@@ -217,7 +244,6 @@ export function ExpansionTimeline() {
       boardId="expansion"
       boardLabel="扩产跟踪"
       title="里程碑时间轴"
-      description="8 个标准阀点 · 5 个扩产计划横向对比 · 供应商/采购双侧明细"
       views={VIEWS}
       rightSlot={
         <button type="button" className="button button-primary" onClick={() => setCreatingPlan(true)}>
@@ -437,8 +463,8 @@ export function ExpansionTimeline() {
                         targetId: item.id,
                         targetLabel: `阀点 ${idx + 1} · ${tmpl.name}`,
                       }) : undefined}
-                      onUpgrade={item?.pendingRiskSignal
-                        ? () => startUpgrade(row, 'item', item.id, itemLabel, item.pendingRiskSignal!, upgradedRisk)
+                      onUpgrade={(item && (item.pendingRiskSignal || upgradedRisk))
+                        ? () => startUpgrade(row, 'item', item.id, itemLabel, item.pendingRiskSignal ?? signalFromExisting(upgradedRisk!), upgradedRisk)
                         : undefined}
                       upgradedRisk={upgradedRisk}
                     />
@@ -458,8 +484,8 @@ export function ExpansionTimeline() {
                   targetLabel: label,
                 })}
                 onPreviewEvidence={setPreviewEvidence}
-                onUpgrade={(a, label) => a.pendingRiskSignal
-                  ? startUpgrade(row, 'approval', a.id, label, a.pendingRiskSignal, a.upgradedRisk)
+                onUpgrade={(a, label) => (a.pendingRiskSignal || a.upgradedRisk)
+                  ? startUpgrade(row, 'approval', a.id, label, a.pendingRiskSignal ?? signalFromExisting(a.upgradedRisk!), a.upgradedRisk)
                   : undefined}
               />
             </section>
@@ -475,8 +501,8 @@ export function ExpansionTimeline() {
                   targetLabel: label,
                 })}
                 onPreviewEvidence={setPreviewEvidence}
-                onUpgrade={(c, label) => c.pendingRiskSignal
-                  ? startUpgrade(row, 'commissioning', c.id, label, c.pendingRiskSignal, c.upgradedRisk)
+                onUpgrade={(c, label) => (c.pendingRiskSignal || c.upgradedRisk)
+                  ? startUpgrade(row, 'commissioning', c.id, label, c.pendingRiskSignal ?? signalFromExisting(c.upgradedRisk!), c.upgradedRisk)
                   : undefined}
               />
             </section>
@@ -492,8 +518,8 @@ export function ExpansionTimeline() {
                   targetLabel: label,
                 })}
                 onPreviewEvidence={setPreviewEvidence}
-                onUpgrade={(r, label) => r.pendingRiskSignal
-                  ? startUpgrade(row, 'ramp', r.id, label, r.pendingRiskSignal, r.upgradedRisk)
+                onUpgrade={(r, label) => (r.pendingRiskSignal || r.upgradedRisk)
+                  ? startUpgrade(row, 'ramp', r.id, label, r.pendingRiskSignal ?? signalFromExisting(r.upgradedRisk!), r.upgradedRisk)
                   : undefined}
               />
             </section>
@@ -667,8 +693,8 @@ function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUplo
           </span>
         )}
         {upgraded && (
-          <span className="upgraded-tag" title="已升级为风险记录">
-            <AlertTriangle size={11} /> 已升级
+          <span className="upgraded-tag" title={`已升级为风险记录 · 最近更新 ${upgradeDate(upgradedRisk)}`}>
+            <AlertTriangle size={11} /> 已升级 {upgradeDate(upgradedRisk)}
           </span>
         )}
       </header>
@@ -735,8 +761,8 @@ function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUplo
           )}
           <div style={{ flex: 1 }} />
           {onUpgrade && (
-            <button type="button" className="row-edit-btn upgrade-btn" onClick={onUpgrade} title={upgraded ? '查看/更新该节点已升级的风险' : '将该节点信号升级为风险记录'}>
-              <AlertTriangle size={11} /> {upgraded ? '已升级（点此更新）' : '升级风险'}
+            <button type="button" className="row-edit-btn upgrade-btn" onClick={onUpgrade} title={upgraded ? `查看/更新该节点已升级的风险（${upgradeDate(upgradedRisk)}）` : '将该节点信号升级为风险记录'}>
+              <AlertTriangle size={11} /> {upgraded ? `已升级 ${upgradeDate(upgradedRisk)}` : '升级风险'}
             </button>
           )}
           {onEdit && (
@@ -817,9 +843,9 @@ function ApprovalSection({ approvals, onEdit, onUploadEvidence, onPreviewEvidenc
                 </td>
                 <td>
                   <div className="row-action-stack">
-                    {a.pendingRiskSignal && (
-                      <button type="button" className="row-edit-btn upgrade-btn" onClick={() => onUpgrade(a, label)} title={upgraded ? '查看/更新该节点已升级的风险' : '将该节点信号升级为风险记录'}>
-                        <AlertTriangle size={11} /> {upgraded ? '已升级（点此更新）' : '升级风险'}
+                    {(a.pendingRiskSignal || a.upgradedRisk) && (
+                      <button type="button" className="row-edit-btn upgrade-btn" onClick={() => onUpgrade(a, label)} title={upgraded ? `查看/更新该节点已升级的风险（${upgradeDate(a.upgradedRisk)}）` : '将该节点信号升级为风险记录'}>
+                        <AlertTriangle size={11} /> {upgraded ? `已升级 ${upgradeDate(a.upgradedRisk)}` : '升级风险'}
                       </button>
                     )}
                     <button type="button" className="row-edit-btn" onClick={() => onEdit(a)}>
@@ -905,9 +931,9 @@ function CommissioningSection({ commissionings, onEdit, onUploadEvidence, onPrev
                 <td>
                   {row && (
                     <div className="row-action-stack">
-                      {row.pendingRiskSignal && (
-                        <button type="button" className="row-edit-btn upgrade-btn" onClick={() => onUpgrade(row, label)} title={upgraded ? '查看/更新该节点已升级的风险' : '将该节点信号升级为风险记录'}>
-                          <AlertTriangle size={11} /> {upgraded ? '已升级（点此更新）' : '升级风险'}
+                      {(row.pendingRiskSignal || row.upgradedRisk) && (
+                        <button type="button" className="row-edit-btn upgrade-btn" onClick={() => onUpgrade(row, label)} title={upgraded ? `查看/更新该节点已升级的风险（${upgradeDate(row.upgradedRisk)}）` : '将该节点信号升级为风险记录'}>
+                          <AlertTriangle size={11} /> {upgraded ? `已升级 ${upgradeDate(row.upgradedRisk)}` : '升级风险'}
                         </button>
                       )}
                       <button type="button" className="row-edit-btn" onClick={() => onEdit(row)}>
@@ -1009,9 +1035,9 @@ function RampSection({ ramps, onEdit, onUploadEvidence, onPreviewEvidence, onUpg
                 <td>
                   {row && (
                     <div className="row-action-stack">
-                      {row.pendingRiskSignal && (
-                        <button type="button" className="row-edit-btn upgrade-btn" onClick={() => onUpgrade(row, label)} title={upgraded ? '查看/更新该节点已升级的风险' : '将该节点信号升级为风险记录'}>
-                          <AlertTriangle size={11} /> {upgraded ? '已升级（点此更新）' : '升级风险'}
+                      {(row.pendingRiskSignal || row.upgradedRisk) && (
+                        <button type="button" className="row-edit-btn upgrade-btn" onClick={() => onUpgrade(row, label)} title={upgraded ? `查看/更新该节点已升级的风险（${upgradeDate(row.upgradedRisk)}）` : '将该节点信号升级为风险记录'}>
+                          <AlertTriangle size={11} /> {upgraded ? `已升级 ${upgradeDate(row.upgradedRisk)}` : '升级风险'}
                         </button>
                       )}
                       <button type="button" className="row-edit-btn" onClick={() => onEdit(row)}>

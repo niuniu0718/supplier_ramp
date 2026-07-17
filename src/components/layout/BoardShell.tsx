@@ -4,7 +4,7 @@ import { ViewTabs, type ViewTabItem } from './ViewTabs'
 
 interface BoardShellProps {
   title: string
-  description: string
+  description?: string
   boardId: string
   boardLabel: string
   views: ViewTabItem[]
@@ -22,11 +22,13 @@ export function BoardShell({ title, description, boardId, boardLabel, views, kpi
         <div>
           <span className="board-eyebrow">{boardLabel}</span>
           <h1>{title}</h1>
-          <p>{description}</p>
+          {description && <p>{description}</p>}
         </div>
-        <div className="board-header-actions">{rightSlot}</div>
       </header>
-      <ViewTabs boardId={boardId} views={views} />
+      <div className="board-tabs-row">
+        <ViewTabs boardId={boardId} views={views} />
+        {rightSlot && <div className="board-tabs-actions">{rightSlot}</div>}
+      </div>
       {kpis && <div className="board-kpis">{kpis}</div>}
       <div className="board-body" data-deeplink={JSON.stringify(deepLink)}>
         {children}
