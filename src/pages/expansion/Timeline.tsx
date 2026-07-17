@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, Paperclip, Pencil, Plus, Trash2, Upload, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Pencil, Plus, Trash2, Upload, type LucideIcon } from 'lucide-react'
 import { BoardShell } from '../../components/layout/BoardShell'
 import { KpiCard } from '../../components/ui/KpiCard'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -179,6 +179,26 @@ export function ExpansionTimeline() {
     setUpgradeToast(isUpdate ? `已更新风险：${upgrading.sourceLabel}` : `已升级为风险：${upgrading.sourceLabel}`)
     setTimeout(() => setUpgradeToast(null), 2400)
     await reload()
+  }
+
+  // 阀点编辑保存后：若状态从「非逾期」变成「逾期」，自动弹升级窗
+  async function onItemSaved() {
+    const prev = editingItem
+    setEditingItem(null)
+    const fresh = await api.get<ExpansionTimelinePayload>('/api/boards/expansion/views/timeline')
+    setData(fresh)
+    if (!prev) return
+    const wasOverdue = prev.overdue
+    for (const row of fresh.rows) {
+      const item = row.items.find((it) => it.id === prev.id)
+      if (!item) continue
+      if (!wasOverdue && item.overdue && item.pendingRiskSignal && !item.upgradedRisk) {
+        const idx = MILESTONE_TEMPLATE.findIndex((t) => t.key === item.milestoneKey)
+        const label = `阀点 ${idx + 1} · ${MILESTONE_TEMPLATE[idx]?.name ?? item.name}`
+        startUpgrade(row, 'item', item.id, label, item.pendingRiskSignal, null)
+        return
+      }
+    }
   }
 
   useEffect(() => {
@@ -466,6 +486,7 @@ export function ExpansionTimeline() {
                       onUpgrade={(item && (item.pendingRiskSignal || upgradedRisk))
                         ? () => startUpgrade(row, 'item', item.id, itemLabel, item.pendingRiskSignal ?? signalFromExisting(upgradedRisk!), upgradedRisk)
                         : undefined}
+                      onPreviewEvidence={setPreviewEvidence}
                       upgradedRisk={upgradedRisk}
                     />
                   )
@@ -546,7 +567,7 @@ export function ExpansionTimeline() {
           item={editingItem}
           planId={editingItem.type}
           onClose={() => setEditingItem(null)}
-          onSaved={reload}
+          onSaved={onItemSaved}
         />
       )}
       {editingApproval && (
@@ -662,16 +683,16 @@ interface MilestoneCardProps {
   onEdit?: () => void
   onUploadEvidence?: () => void
   onUpgrade?: () => void
+  onPreviewEvidence?: (e: EvidenceAttachment) => void
   upgradedRisk?: UpgradedRiskRef | null
 }
 
-function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUploadEvidence, onUpgrade, upgradedRisk }: MilestoneCardProps) {
+function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUploadEvidence, onUpgrade, onPreviewEvidence, upgradedRisk }: MilestoneCardProps) {
   const meta = item ? milestoneStatusMeta(item.status) : milestoneStatusMeta('未开始')
   const Icon = TemplateIcon
   const overdue = item?.overdue ?? false
   const tone = overdue ? 'overdue' : meta.tone
   const pillMeta = PILL_META[tone]
-  const evCount = item?.evidence.length ?? 0
   const upgraded = !!upgradedRisk
   return (
     <div className={`milestone-card ${overdue ? 'is-overdue' : ''} tone-${tone}`}>
@@ -687,11 +708,6 @@ function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUplo
         >
           {pillMeta.label}
         </span>
-        {overdue && (
-          <span className="overdue-badge">
-            <AlertTriangle size={11} /> 逾期 {item?.delayDays ?? 0} 天
-          </span>
-        )}
         {upgraded && (
           <span className="upgraded-tag" title={`已升级为风险记录 · 最近更新 ${upgradeDate(upgradedRisk)}`}>
             <AlertTriangle size={11} /> 已升级 {upgradeDate(upgradedRisk)}
@@ -709,24 +725,13 @@ function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUplo
             {item?.actualArrival ? fmtDate(item.actualArrival) : '—'}
           </span>
         </div>
-        <div>
+        <div className="milestone-card-evidence">
           <small className="muted">佐证</small>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <Paperclip size={11} className="muted" /> {evCount}
-            </span>
-            {evCount > 0 && item && item.evidence[0] && (
-              <a
-                className="evidence-quick-link"
-                href={item.evidence[0].url}
-                target="_blank"
-                rel="noreferrer"
-                title={`预览首张佐证：${item.evidence[0].name}`}
-              >
-                预览
-              </a>
-            )}
-          </span>
+          {item ? (
+            <EvidenceChipList evidence={item.evidence} onPreview={onPreviewEvidence ?? (() => {})} emptyText="—" />
+          ) : (
+            <span className="muted">—</span>
+          )}
         </div>
       </div>
       <div className="milestone-card-sides">
@@ -747,18 +752,6 @@ function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUplo
       )}
       {item && (
         <footer className="milestone-card-foot">
-          {evCount > 0 && (
-            <div className="evidence-chip-row">
-              {item.evidence.slice(0, 3).map((e) => (
-                <a key={e.id} href={e.url} target="_blank" rel="noreferrer"
-                   className={`evidence-chip verification-${e.verificationStatus === 'VERIFIED' ? 'verified' : e.verificationStatus === 'REJECTED' ? 'rejected' : e.requiresVerification ? 'pending' : 'neutral'}`}
-                   title={`${e.name}${e.requiresVerification ? ` · ${e.verificationStatus === 'VERIFIED' ? '已认证' : e.verificationStatus === 'REJECTED' ? '已退回' : '待认证'}` : ''}`}>
-                  {e.name}
-                </a>
-              ))}
-              {evCount > 3 && <span className="evidence-chip muted">+{evCount - 3}</span>}
-            </div>
-          )}
           <div style={{ flex: 1 }} />
           {onUpgrade && (
             <button type="button" className="row-edit-btn upgrade-btn" onClick={onUpgrade} title={upgraded ? `查看/更新该节点已升级的风险（${upgradeDate(upgradedRisk)}）` : '将该节点信号升级为风险记录'}>

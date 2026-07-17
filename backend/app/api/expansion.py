@@ -63,9 +63,13 @@ def _enrich_plan(plan: ExpansionPlan) -> Dict[str, Any]:
 
 def _enrich_item(it: ExpansionItem, min_start: float, total: float) -> Dict[str, Any]:
     expected_ms = it.expected_arrival.timestamp() * 1000
-    overdue = not it.actual_arrival and datetime.utcnow() > it.expected_arrival
+    # 逾期判定：日期未完成且已过计划完成时间，**或** 手动把状态改成「已逾期」
+    overdue = (it.status == "已逾期") or (not it.actual_arrival and datetime.utcnow() > it.expected_arrival)
     if overdue:
-        delay = max(it.delay_days, int((datetime.utcnow().timestamp() * 1000 - expected_ms) / 86_400_000))
+        if it.status == "已逾期" and it.delay_days > 0:
+            delay = it.delay_days
+        else:
+            delay = max(it.delay_days, int((datetime.utcnow().timestamp() * 1000 - expected_ms) / 86_400_000))
     else:
         delay = it.delay_days
     pct = ((expected_ms - min_start) / total) * 100 if total > 0 else 0

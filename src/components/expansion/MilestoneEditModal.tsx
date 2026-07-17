@@ -9,7 +9,7 @@ interface Props {
   item: ExpansionMilestoneItem
   planId: string
   onClose: () => void
-  onSaved: () => void
+  onSaved: (updatedItem?: ExpansionMilestoneItem) => void
 }
 
 export function MilestoneEditModal({ item, onClose, onSaved }: Props) {
@@ -34,7 +34,7 @@ export function MilestoneEditModal({ item, onClose, onSaved }: Props) {
     }
     setSaving(true)
     try {
-      await api.patch(`/api/expansion-items/${item.id}`, {
+      const resp = await api.patch<{ item: ExpansionMilestoneItem }>(`/api/expansion-items/${item.id}`, {
         status,
         expected_arrival: serialize(expected),
         actual_arrival: serialize(actual),
@@ -42,7 +42,7 @@ export function MilestoneEditModal({ item, onClose, onSaved }: Props) {
         procurement_action: procurementAction,
         note,
       })
-      onSaved()
+      onSaved(resp.item)
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存失败。')
