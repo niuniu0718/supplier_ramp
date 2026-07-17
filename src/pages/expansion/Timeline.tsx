@@ -181,24 +181,10 @@ export function ExpansionTimeline() {
     await reload()
   }
 
-  // 阀点编辑保存后：若状态从「非逾期」变成「逾期」，自动弹升级窗
+  // 阀点编辑保存后：刷新数据。状态改成「已逾期」会让升级风险按钮自动出现（无需弹窗）
   async function onItemSaved() {
-    const prev = editingItem
     setEditingItem(null)
-    const fresh = await api.get<ExpansionTimelinePayload>('/api/boards/expansion/views/timeline')
-    setData(fresh)
-    if (!prev) return
-    const wasOverdue = prev.overdue
-    for (const row of fresh.rows) {
-      const item = row.items.find((it) => it.id === prev.id)
-      if (!item) continue
-      if (!wasOverdue && item.overdue && item.pendingRiskSignal && !item.upgradedRisk) {
-        const idx = MILESTONE_TEMPLATE.findIndex((t) => t.key === item.milestoneKey)
-        const label = `阀点 ${idx + 1} · ${MILESTONE_TEMPLATE[idx]?.name ?? item.name}`
-        startUpgrade(row, 'item', item.id, label, item.pendingRiskSignal, null)
-        return
-      }
-    }
+    await reload()
   }
 
   useEffect(() => {
@@ -567,7 +553,7 @@ export function ExpansionTimeline() {
           item={editingItem}
           planId={editingItem.type}
           onClose={() => setEditingItem(null)}
-          onSaved={onItemSaved}
+          onSaved={onItemSaved as (updatedItem?: ExpansionMilestoneItem) => void}
         />
       )}
       {editingApproval && (
