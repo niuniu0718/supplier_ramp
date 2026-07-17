@@ -655,6 +655,21 @@ function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUplo
             <AlertTriangle size={11} /> 逾期 {item?.delayDays ?? 0} 天
           </span>
         )}
+        {onUpgrade && !upgraded && (
+          <button
+            type="button"
+            className="upgrade-header-btn"
+            onClick={onUpgrade}
+            title="将该节点信号升级为风险记录（生成到风险预警看板）"
+          >
+            <AlertTriangle size={12} /> 升级风险
+          </button>
+        )}
+        {upgraded && (
+          <span className="upgraded-tag" title="已升级为风险记录">
+            <AlertTriangle size={11} /> 已升级
+          </span>
+        )}
       </header>
       <div className="milestone-card-dates">
         <div>
@@ -705,16 +720,6 @@ function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUplo
             </div>
           )}
           <div style={{ flex: 1 }} />
-          {onUpgrade && !upgraded && (
-            <button type="button" className="row-edit-btn upgrade-btn" onClick={onUpgrade} title="将该节点信号升级为风险记录">
-              <AlertTriangle size={11} /> 升级风险
-            </button>
-          )}
-          {upgraded && (
-            <span className="upgraded-tag" title="已升级为风险记录">
-              <AlertTriangle size={11} /> 已升级
-            </span>
-          )}
           {onEdit && (
             <button type="button" className="row-edit-btn" onClick={onEdit}>
               <Pencil size={11} /> 编辑
@@ -794,7 +799,7 @@ function ApprovalSection({ approvals, onEdit, onUploadEvidence, onPreviewEvidenc
                 <td>
                   <div className="row-action-stack">
                     {a.pendingRiskSignal && !upgradedKeys[idx] && (
-                      <button type="button" className="row-edit-btn upgrade-btn" onClick={() => onUpgrade(a, label)}>
+                      <button type="button" className="upgrade-row-btn" onClick={() => onUpgrade(a, label)} title="将该审批信号升级为风险记录">
                         <AlertTriangle size={11} /> 升级风险
                       </button>
                     )}
@@ -885,7 +890,7 @@ function CommissioningSection({ commissionings, onEdit, onUploadEvidence, onPrev
                   {row && (
                     <div className="row-action-stack">
                       {row.pendingRiskSignal && !upgradedKeys[idx] && (
-                        <button type="button" className="row-edit-btn upgrade-btn" onClick={() => onUpgrade(row, label)}>
+                        <button type="button" className="upgrade-row-btn" onClick={() => onUpgrade(row, label)} title="将该节点信号升级为风险记录">
                           <AlertTriangle size={11} /> 升级风险
                         </button>
                       )}
@@ -992,7 +997,7 @@ function RampSection({ ramps, onEdit, onUploadEvidence, onPreviewEvidence, onUpg
                   {row && (
                     <div className="row-action-stack">
                       {row.pendingRiskSignal && !upgradedKeys[idx] && (
-                        <button type="button" className="row-edit-btn upgrade-btn" onClick={() => onUpgrade(row, label)}>
+                        <button type="button" className="upgrade-row-btn" onClick={() => onUpgrade(row, label)} title="将该节点信号升级为风险记录">
                           <AlertTriangle size={11} /> 升级风险
                         </button>
                       )}
