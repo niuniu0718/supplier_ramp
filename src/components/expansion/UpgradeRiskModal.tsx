@@ -6,6 +6,7 @@ import type {
   RiskLevel,
   RiskRow,
   RiskSourceKind,
+  UpgradedRiskRef,
 } from '../../types'
 import { LEVEL_LABEL, LEVEL_ORDER, levelBadgeMeta, typeBadgeMeta } from '../../lib/risk'
 
@@ -17,8 +18,9 @@ interface Props {
   sourceLabel: string
   signal: PendingRiskSignal
   materialId: string
+  existing: UpgradedRiskRef | null
   onClose: () => void
-  onCreated: (risk: RiskRow) => void
+  onUpserted: (risk: RiskRow) => void
 }
 
 export function UpgradeRiskModal({
@@ -29,21 +31,34 @@ export function UpgradeRiskModal({
   sourceLabel,
   signal,
   materialId,
+  existing,
   onClose,
-  onCreated,
+  onUpserted,
 }: Props) {
-  const [level, setLevel] = useState<RiskLevel>(signal.level)
-  const [description, setDescription] = useState(`[自动生成] ${signal.reason}`)
+  const [level, setLevel] = useState<RiskLevel>(existing?.level ?? signal.level)
+  const [description, setDescription] = useState(
+    existing ? '' : `[自动生成] ${signal.reason}`,
+  )
   const [impactScope, setImpactScope] = useState(planName)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [hydrated, setHydrated] = useState(!existing)
   const typeMeta = typeBadgeMeta(signal.type)
   const initialLevelMeta = levelBadgeMeta(signal.level)
 
+  // 已有风险时，从 GET /api/risks/{id} 拉完整记录以预填 description/impactScope
   useEffect(() => {
-    setLevel(signal.level)
-    setDescription(`[自动生成] ${signal.reason}`)
-  }, [signal])
+    if (!existing) return
+    let cancelled = false
+    api.get<RiskRow>(`/api/risks/${existing.id}`).then((r) => {
+      if (cancelled) return
+      setDescription(r.description)
+      setImpactScope(r.impactScope || planName)
+      setLevel(r.level)
+      setHydrated(true)
+    }).catch(() => setHydrated(true))
+    return () => { cancelled = true }
+  }, [existing, planName])
 
   async function submit() {
     setError('')
@@ -60,7 +75,7 @@ export function UpgradeRiskModal({
         sourceId,
         sourcePlanId: planId,
       })
-      onCreated(risk)
+      onUpserted(risk)
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : '提交失败。')
@@ -69,21 +84,36 @@ export function UpgradeRiskModal({
     }
   }
 
+  const isUpdate = !!existing
+  const title = isUpdate ? `更新风险 · ${sourceLabel}` : `升级风险 · ${sourceLabel}`
+
   return (
     <Modal
-      title={`升级风险 · ${sourceLabel}`}
+      title={title}
       onClose={onClose}
       width={560}
       footer={
         <>
           <button className="button button-secondary" onClick={onClose} disabled={submitting}>取消</button>
-          <button className="button button-primary" onClick={submit} disabled={submitting}>
-            {submitting ? '提交中…' : '升级为风险'}
+          <button className="button button-primary" onClick={submit} disabled={submitting || !hydrated}>
+            {submitting ? '提交中…' : isUpdate ? '保存更新' : '升级为风险'}
           </button>
         </>
       }
     >
       {error && <p className="form-error">{error}</p>}
+
+      {isUpdate && (
+        <div className="upgrade-signal-card upgrade-signal-update">
+          <div className="upgrade-signal-row">
+            <span className="muted">已有风险</span>
+            <span className={`milestone-pill tone-${levelBadgeMeta(existing!.level).tone}`}>
+              {levelBadgeMeta(existing!.level).label} · {existing!.status}
+            </span>
+            <small className="muted">提交后保留原风险 ID，覆盖 level / 描述 / 范围</small>
+          </div>
+        </div>
+      )}
 
       <div className="upgrade-signal-card">
         <div className="upgrade-signal-row">

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
 from ..db import get_db
-from ..models import Approval, CommissioningItem, ExpansionItem, ExpansionPlan, EvidenceChain, Material, RampItem, Supplier
+from ..models import Approval, CommissioningItem, ExpansionItem, ExpansionPlan, EvidenceChain, Material, RampItem, Risk, Supplier
 from ..security import require_session
 from ..services.approval_types import APPROVAL_BY_KEY, APPROVAL_TYPES
 from ..services.commissioning_types import COMMISSIONING_BY_KEY, COMMISSIONING_TYPES
@@ -305,6 +305,33 @@ def expansion_timeline(
         for e in all_evidence:
             key = (e.plan_id, e.target_kind, e.target_id)
             evidence_by_node.setdefault(key, []).append(e)
+    # 一次性查所有 L2 节点级风险（按 source 三元组分组），供 timeline 节点打 "已升级" 标签
+    risk_by_source: Dict[tuple, Dict[str, Any]] = {}
+    if plan_ids:
+        all_l2_risks = (
+            db.query(Risk)
+            .filter(
+                Risk.source_plan_id.in_(plan_ids),
+                Risk.source_kind.isnot(None),
+                Risk.source_id.isnot(None),
+            )
+            .order_by(
+                # OPEN/IN_PROGRESS 优先，CLOSED 排后面（前端需要知道"已升级过"）
+                (Risk.status == "CLOSED").asc(),
+                Risk.discovered_at.desc(),
+            )
+            .all()
+        )
+        for r in all_l2_risks:
+            key = (r.source_plan_id, r.source_kind, r.source_id)
+            if key not in risk_by_source:
+                risk_by_source[key] = {
+                    "id": r.id,
+                    "level": r.level,
+                    "status": r.status,
+                    "closedAt": r.closed_at.isoformat() if r.closed_at else None,
+                    "discoveredAt": r.discovered_at.isoformat() if r.discovered_at else None,
+                }
     for p in plans:
         actual = calculate_actual_progress(p.items)
         result = calculate_expansion_risk(p.start_date, p.end_date, actual)
@@ -314,16 +341,20 @@ def expansion_timeline(
         for it in sorted_items:
             row = _enrich_item(it, min_start, total)
             row["evidence"] = [_enrich_evidence(e) for e in evidence_by_node.get((p.id, "item", it.id), [])]
+            row["upgradedRisk"] = risk_by_source.get((p.id, "item", it.id))
             items.append(row)
         approvals = [_enrich_approval(a) for a in sorted(p.approvals, key=lambda x: APPROVAL_BY_KEY.get(x.type, {}).get("order", 99))]
         for a in approvals:
             a["evidence"] = [_enrich_evidence(e) for e in evidence_by_node.get((p.id, "approval", a["id"]), [])]
+            a["upgradedRisk"] = risk_by_source.get((p.id, "approval", a["id"]))
         commissionings = [_enrich_commissioning(c) for c in sorted(p.commissionings, key=lambda x: COMMISSIONING_BY_KEY.get(x.type, {}).get("order", 99))]
         for c in commissionings:
             c["evidence"] = [_enrich_evidence(e) for e in evidence_by_node.get((p.id, "commissioning", c["id"]), [])]
+            c["upgradedRisk"] = risk_by_source.get((p.id, "commissioning", c["id"]))
         ramps = [_enrich_ramp(r) for r in sorted(p.ramps, key=lambda x: RAMP_BY_PHASE.get(x.phase, {}).get("order", 99))]
         for r in ramps:
             r["evidence"] = [_enrich_evidence(e) for e in evidence_by_node.get((p.id, "ramp", r["id"]), [])]
+            r["upgradedRisk"] = risk_by_source.get((p.id, "ramp", r["id"]))
         overdue = sum(1 for i in items if i["overdue"])
         overdue_total += overdue
         item_total += len(items)

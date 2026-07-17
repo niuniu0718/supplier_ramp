@@ -310,7 +310,8 @@ def create_risk(
         raise HTTPException(status_code=404, detail="物料不存在。")
 
     # L2 节点级风险：必须提供 source 三元组并校验存在
-    if risk_type in {"APPROVAL_OVERDUE", "COMMISSIONING_FAIL", "RAMP_BELOW_TARGET", "MILESTONE_DELAYED"}:
+    is_l2_type = risk_type in {"APPROVAL_OVERDUE", "COMMISSIONING_FAIL", "RAMP_BELOW_TARGET", "MILESTONE_DELAYED"}
+    if is_l2_type:
         if source_kind not in _VALID_SOURCE_KINDS or not source_id:
             raise HTTPException(
                 status_code=400,
@@ -326,6 +327,36 @@ def create_risk(
             raise HTTPException(status_code=404, detail=f"{source_kind}#{source_id} 不存在。")
         if source_plan_id and not db.get(ExpansionPlan, source_plan_id):
             raise HTTPException(status_code=404, detail=f"plan#{source_plan_id} 不存在。")
+
+    # Upsert：同一 source 三元组已有风险则覆盖（不重复创建）
+    # 优先选 OPEN/IN_PROGRESS；CLOSED 也复用并重开（保留"已升级"标记）
+    existing = None
+    if is_l2_type and source_plan_id:
+        existing = (
+            db.query(Risk)
+            .filter(
+                Risk.source_kind == source_kind,
+                Risk.source_id == source_id,
+                Risk.source_plan_id == source_plan_id,
+            )
+            .order_by(
+                # OPEN/IN_PROGRESS 排前面
+                (Risk.status == "CLOSED").asc(),
+                Risk.discovered_at.desc(),
+            )
+            .first()
+        )
+    if existing is not None:
+        existing.level = level
+        existing.description = description
+        existing.impact_scope = impact_scope
+        if existing.status == "CLOSED":
+            # 重开（清掉 closedAt，让前端 toast 能识别"重新升级"）
+            existing.status = "IN_PROGRESS"
+            existing.closed_at = None
+        db.commit()
+        db.refresh(existing)
+        return _serialize_risk(existing, db)
 
     import uuid
 

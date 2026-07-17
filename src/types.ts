@@ -39,6 +39,14 @@ export interface PendingRiskSignal {
   reason: string
 }
 
+export interface UpgradedRiskRef {
+  id: string
+  level: RiskLevel
+  status: string
+  closedAt: string | null
+  discoveredAt: string | null
+}
+
 export type Role = 'PROCUREMENT_MANAGER' | 'PROCUREMENT_ENGINEER' | 'DEPARTMENT_LEADER' | 'SUPPLIER'
 
 export interface UserSummary {
@@ -124,6 +132,7 @@ export interface ExpansionMilestoneItem {
   milestoneName: string
   evidence: EvidenceAttachment[]
   pendingRiskSignal: PendingRiskSignal | null
+  upgradedRisk: UpgradedRiskRef | null
 }
 
 export interface ExpansionTimelineRow {
@@ -166,6 +175,7 @@ export interface ApprovalRow {
   note: string
   evidence: EvidenceAttachment[]
   pendingRiskSignal: PendingRiskSignal | null
+  upgradedRisk: UpgradedRiskRef | null
 }
 
 export interface CommissioningRow {
@@ -182,6 +192,7 @@ export interface CommissioningRow {
   note: string
   evidence: EvidenceAttachment[]
   pendingRiskSignal: PendingRiskSignal | null
+  upgradedRisk: UpgradedRiskRef | null
 }
 
 export interface RampRow {
@@ -198,6 +209,7 @@ export interface RampRow {
   note: string
   evidence: EvidenceAttachment[]
   pendingRiskSignal: PendingRiskSignal | null
+  upgradedRisk: UpgradedRiskRef | null
 }
 
 export interface ExpansionTimelinePayload {

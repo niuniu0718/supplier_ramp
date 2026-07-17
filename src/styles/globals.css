@@ -1895,3 +1895,31 @@ a { color: inherit; }
   white-space: nowrap;
 }
 .upgrade-row-btn:hover { background: #e94e0f; }
+
+/* === 升级风险按钮（嵌入编辑/+佐证按钮区） === */
+.upgrade-btn {
+  background: #ff5a1f !important;
+  color: #fff !important;
+  border: none !important;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(255, 90, 31, 0.3);
+}
+.upgrade-btn:hover {
+  background: #e94e0f !important;
+  box-shadow: 0 2px 4px rgba(255, 90, 31, 0.45);
+}
+
+/* 附件快速预览链接（数量右侧） */
+.evidence-quick-link {
+  font-size: 10px;
+  color: var(--primary);
+  background: #f0f5ff;
+  padding: 1px 6px;
+  border-radius: 8px;
+  text-decoration: none;
+  border: 1px solid #d6e4ff;
+}
+.evidence-quick-link:hover {
+  background: #e0ebff;
+  text-decoration: none;
+}
