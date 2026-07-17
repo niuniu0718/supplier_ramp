@@ -21,6 +21,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(expansion.router)
 app.include_router(risks.router)
+app.include_router(risks.crud_router)
 app.include_router(tasks.router)
 app.include_router(notifications.router)
 

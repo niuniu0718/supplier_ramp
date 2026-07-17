@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..db import Base
@@ -26,6 +26,13 @@ class Risk(Base):
     status: Mapped[str] = mapped_column(String, default="OPEN")
     is_auto: Mapped[bool] = mapped_column("isAuto", Boolean, default=False)
     closed_at: Mapped[Optional[datetime]] = mapped_column("closedAt", DateTime, nullable=True)
+
+    # 反向链接字段：标识本条风险源自哪一个 L2 节点
+    # 可空；为 NULL 时表示物料级风险（与原有 5 种风险类型一致）
+    # 应用层校验 source_kind + source_id，不强制外键（避免跨表级联删除复杂度）
+    source_kind: Mapped[Optional[str]] = mapped_column("sourceKind", String, nullable=True, index=True)
+    source_id: Mapped[Optional[int]] = mapped_column("sourceId", Integer, nullable=True, index=True)
+    source_plan_id: Mapped[Optional[str]] = mapped_column("sourcePlanId", String, nullable=True, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

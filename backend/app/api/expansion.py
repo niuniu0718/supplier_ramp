@@ -69,6 +69,15 @@ def _enrich_item(it: ExpansionItem, min_start: float, total: float) -> Dict[str,
     else:
         delay = it.delay_days
     pct = ((expected_ms - min_start) / total) * 100 if total > 0 else 0
+    # 候选风险信号：阀点逾期 > 7 天时建议升级为风险
+    pending_risk_signal = None
+    if overdue and delay > 7:
+        pending_risk_signal = {
+            "type": "MILESTONE_DELAYED",
+            "level": "ORANGE" if delay > 30 else "YELLOW",
+            "delayDays": delay,
+            "reason": f"阀点「{milestone_name(it.milestone_key)}」已延期 {delay} 天",
+        }
     return {
         "id": it.id,
         "name": it.name,
@@ -87,6 +96,7 @@ def _enrich_item(it: ExpansionItem, min_start: float, total: float) -> Dict[str,
         "milestoneOrder": it.milestone_order,
         "milestoneName": milestone_name(it.milestone_key),
         "note": it.note,
+        "pendingRiskSignal": pending_risk_signal,
     }
 
 
@@ -104,6 +114,17 @@ def _enrich_approval(a: Approval) -> Dict[str, Any]:
     else:
         status = "进行中"
         overdue = False
+    # 候选风险信号：审批逾期 > 14 天时建议升级为风险
+    pending_risk_signal = None
+    if overdue and a.expected_at:
+        delay = int((datetime.utcnow() - a.expected_at).total_seconds() / 86_400)
+        if delay > 14:
+            pending_risk_signal = {
+                "type": "APPROVAL_OVERDUE",
+                "level": "RED" if delay > 30 else "ORANGE",
+                "delayDays": delay,
+                "reason": f"审批「{tmpl.get('name', a.type)}」已逾期 {delay} 天",
+            }
     return {
         "id": a.id,
         "order": tmpl.get("order", 99),
@@ -116,6 +137,7 @@ def _enrich_approval(a: Approval) -> Dict[str, Any]:
         "status": status,
         "overdue": overdue,
         "note": a.note,
+        "pendingRiskSignal": pending_risk_signal,
     }
 
 
@@ -129,6 +151,15 @@ PASS_STATUS_META = {
 
 def _enrich_commissioning(c: CommissioningItem) -> Dict[str, Any]:
     tmpl = COMMISSIONING_BY_KEY.get(c.type, {"order": 99, "name": c.type, "standard": ""})
+    # 候选风险信号：试车不合格时建议升级为风险
+    pending_risk_signal = None
+    if c.pass_status == "FAIL":
+        pending_risk_signal = {
+            "type": "COMMISSIONING_FAIL",
+            "level": "RED",
+            "delayDays": 0,
+            "reason": f"试车「{tmpl.get('name', c.type)}」判定不合格",
+        }
     return {
         "id": c.id,
         "order": tmpl.get("order", 99),
@@ -141,6 +172,7 @@ def _enrich_commissioning(c: CommissioningItem) -> Dict[str, Any]:
         "passLabel": PASS_STATUS_META.get(c.pass_status, c.pass_status),
         "verifiedAt": c.verified_at.isoformat() if c.verified_at else None,
         "note": c.note,
+        "pendingRiskSignal": pending_risk_signal,
     }
 
 
@@ -154,6 +186,23 @@ RAMP_STATUS_META = {
 
 def _enrich_ramp(r: RampItem) -> Dict[str, Any]:
     tmpl = RAMP_BY_PHASE.get(r.phase, {"order": 99, "loadRate": r.target_load_rate, "period": ""})
+    # 候选风险信号：爬坡未达标（status=FAIL 或 实际 < 目标 80%）
+    pending_risk_signal = None
+    if r.status == "FAIL":
+        pending_risk_signal = {
+            "type": "RAMP_BELOW_TARGET",
+            "level": "ORANGE",
+            "delayDays": 0,
+            "reason": f"爬坡阶段「{r.phase}」未达标",
+        }
+    elif (r.actual_capacity is not None and r.target_capacity > 0
+          and r.actual_capacity < r.target_capacity * 0.8):
+        pending_risk_signal = {
+            "type": "RAMP_BELOW_TARGET",
+            "level": "ORANGE",
+            "delayDays": 0,
+            "reason": f"爬坡阶段「{r.phase}」实际产能 {r.actual_capacity:.0f} < 目标 {r.target_capacity:.0f} 的 80%",
+        }
     return {
         "id": r.id,
         "order": tmpl.get("order", 99),
@@ -166,6 +215,7 @@ def _enrich_ramp(r: RampItem) -> Dict[str, Any]:
         "status": r.status,
         "statusLabel": RAMP_STATUS_META.get(r.status, r.status),
         "note": r.note,
+        "pendingRiskSignal": pending_risk_signal,
     }
 
 
