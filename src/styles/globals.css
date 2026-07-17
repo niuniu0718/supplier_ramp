@@ -1621,19 +1621,6 @@ a { color: inherit; }
   gap: 10px;
 }
 
-.board-tabs-row {
-  display: flex;
-  align-items: stretch;
-  gap: 12px;
-  justify-content: space-between;
-}
-.board-tabs-row .view-tabs { flex: 1; }
-.board-tabs-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 /* PlanEditModal — 子节点计划时间编辑 */
 .plan-edit-children {
   margin-top: 18px;

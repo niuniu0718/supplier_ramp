@@ -24,11 +24,9 @@ export function BoardShell({ title, description, boardId, boardLabel, views, kpi
           <h1>{title}</h1>
           {description && <p>{description}</p>}
         </div>
+        <div className="board-header-actions">{rightSlot}</div>
       </header>
-      <div className="board-tabs-row">
-        <ViewTabs boardId={boardId} views={views} />
-        {rightSlot && <div className="board-tabs-actions">{rightSlot}</div>}
-      </div>
+      <ViewTabs boardId={boardId} views={views} />
       {kpis && <div className="board-kpis">{kpis}</div>}
       <div className="board-body" data-deeplink={JSON.stringify(deepLink)}>
         {children}
