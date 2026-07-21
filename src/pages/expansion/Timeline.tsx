@@ -86,6 +86,121 @@ function upgradeDate(ref: UpgradedRiskRef | null | undefined): string {
   return fmtYMD(ref.updatedAt || ref.discoveredAt)
 }
 
+type SectionKey = 'milestones' | 'approvals' | 'commissionings' | 'ramps'
+
+const COLLAPSE_STORAGE_KEY = 'supplier_ramp.timeline.collapsedSections'
+
+function loadCollapsedSections(): Record<string, Set<SectionKey>> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(COLLAPSE_STORAGE_KEY)
+    if (!raw) return {}
+    const obj = JSON.parse(raw)
+    const result: Record<string, Set<SectionKey>> = {}
+    for (const [k, v] of Object.entries(obj as Record<string, string[]>)) {
+      result[k] = new Set((v ?? []).filter((s) => ['milestones', 'approvals', 'commissionings', 'ramps'].includes(s)) as SectionKey[])
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
+function saveCollapsedSections(map: Record<string, Set<SectionKey>>) {
+  if (typeof window === 'undefined') return
+  try {
+    const out: Record<string, string[]> = {}
+    for (const [k, v] of Object.entries(map)) out[k] = Array.from(v)
+    window.localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(out))
+  } catch { /* noop */ }
+}
+
+// L2 完成态摘要：折叠时在标题旁简短提示该 plan 的整体进度
+// 仅返回非零项，按"已逾期 → 进行中 → 已完成"反向优先级排序以便一眼看到风险
+type SummaryChip = { label: string; tone: 'green' | 'orange' | 'red' | 'gray' }
+
+function summarizeMilestones(row: ExpansionTimelineRow): { total: number; chips: SummaryChip[] } {
+  const items = row.items
+  let done = 0, overdue = 0, progress = 0, pending = 0
+  for (const it of items) {
+    if (it.actualArrival || it.status === '已完成') done++
+    else if (it.overdue || it.status === '已逾期') overdue++
+    else if (it.status === '进行中') progress++
+    else pending++
+  }
+  const chips: SummaryChip[] = []
+  if (overdue) chips.push({ label: `${overdue} 已逾期`, tone: 'red' })
+  if (progress) chips.push({ label: `${progress} 进行中`, tone: 'orange' })
+  if (pending) chips.push({ label: `${pending} 未开始`, tone: 'gray' })
+  if (done && done === items.length) chips.unshift({ label: `已全部完成`, tone: 'green' })
+  else if (done) chips.unshift({ label: `${done}/${items.length} 已完成`, tone: 'green' })
+  return { total: items.length, chips }
+}
+
+function summarizeApprovals(row: ExpansionTimelineRow): { total: number; chips: SummaryChip[] } {
+  const list = row.approvals
+  let done = 0, overdue = 0, progress = 0, pending = 0
+  for (const a of list) {
+    if (a.status === '已完成') done++
+    else if (a.status === '已逾期') overdue++
+    else if (a.status === '进行中') progress++
+    else pending++
+  }
+  const chips: SummaryChip[] = []
+  if (overdue) chips.push({ label: `${overdue} 已逾期`, tone: 'red' })
+  if (progress) chips.push({ label: `${progress} 进行中`, tone: 'orange' })
+  if (pending) chips.push({ label: `${pending} 未开始`, tone: 'gray' })
+  if (done && done === list.length) chips.unshift({ label: `已全部批复`, tone: 'green' })
+  else if (done) chips.unshift({ label: `${done}/${list.length} 已批复`, tone: 'green' })
+  return { total: list.length, chips }
+}
+
+function summarizeCommissionings(row: ExpansionTimelineRow): { total: number; chips: SummaryChip[] } {
+  const list = row.commissionings
+  let pass = 0, fail = 0, progress = 0, pending = 0
+  for (const c of list) {
+    if (c.passStatus === 'PASS') pass++
+    else if (c.passStatus === 'FAIL') fail++
+    else if (c.passStatus === 'IN_PROGRESS') progress++
+    else pending++
+  }
+  const chips: SummaryChip[] = []
+  if (fail) chips.push({ label: `${fail} 未通过`, tone: 'red' })
+  if (progress) chips.push({ label: `${progress} 验证中`, tone: 'orange' })
+  if (pending) chips.push({ label: `${pending} 待评估`, tone: 'gray' })
+  if (pass && pass === list.length) chips.unshift({ label: `已全部通过`, tone: 'green' })
+  else if (pass) chips.unshift({ label: `${pass}/${list.length} 已通过`, tone: 'green' })
+  return { total: list.length, chips }
+}
+
+function summarizeRamps(row: ExpansionTimelineRow): { total: number; chips: SummaryChip[] } {
+  const list = row.ramps
+  let pass = 0, fail = 0, progress = 0, pending = 0
+  for (const r of list) {
+    if (r.status === 'PASS') pass++
+    else if (r.status === 'FAIL') fail++
+    else if (r.status === 'IN_PROGRESS') progress++
+    else pending++
+  }
+  const chips: SummaryChip[] = []
+  if (fail) chips.push({ label: `${fail} 未达标`, tone: 'red' })
+  if (progress) chips.push({ label: `${progress} 进行中`, tone: 'orange' })
+  if (pending) chips.push({ label: `${pending} 待确认`, tone: 'gray' })
+  if (pass && pass === list.length) chips.unshift({ label: `已全部达标`, tone: 'green' })
+  else if (pass) chips.unshift({ label: `${pass}/${list.length} 已确认`, tone: 'green' })
+  return { total: list.length, chips }
+}
+
+function SectionSummary({ summary }: { summary: { chips: SummaryChip[] } }) {
+  if (summary.chips.length === 0) return null
+  return (
+    <span className="section-summary">
+      {summary.chips.map((c, i) => (
+        <span key={i} className={`section-summary-chip tone-${c.tone}`}>{c.label}</span>
+      ))}
+    </span>
+  )
+}
+
 type EvidenceTarget =
   | { kind: 'plan'; planId: string; planName: string }
   | { kind: 'item'; planId: string; planName: string; targetId: number; targetLabel: string }
@@ -132,6 +247,19 @@ export function ExpansionTimeline() {
   const [previewEvidence, setPreviewEvidence] = useState<EvidenceAttachment | null>(null)
   const [upgrading, setUpgrading] = useState<UpgradeTarget | null>(null)
   const [upgradeToast, setUpgradeToast] = useState<string | null>(null)
+  // L2 折叠：单个 section 收起（按 planId 隔离），存 localStorage
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, Set<SectionKey>>>(() => loadCollapsedSections())
+
+  function toggleSection(planId: string, key: SectionKey) {
+    setCollapsedSections((prev) => {
+      const next: Record<string, Set<SectionKey>> = { ...prev }
+      const cur = new Set(next[planId] ?? [])
+      if (cur.has(key)) cur.delete(key); else cur.add(key)
+      next[planId] = cur
+      saveCollapsedSections(next)
+      return next
+    })
+  }
 
   function reload() {
     return api.get<ExpansionTimelinePayload>('/api/boards/expansion/views/timeline').then(setData)
@@ -418,10 +546,12 @@ export function ExpansionTimeline() {
       </article>
 
       <section className="timeline-all-milestones">
-        {data.rows.map((row) => (
+        {data.rows.map((row) => {
+          const planSections = collapsedSections[row.id] ?? new Set<SectionKey>()
+          return (
           <div key={row.id} id={`plan-group-${row.id}`} className="timeline-plan-group">
             <header className="timeline-plan-group-head">
-              <div>
+              <div className="plan-title">
                 <strong>{row.name}</strong>
                 <small className="muted">{row.supplierName} · {row.materialName}</small>
               </div>
@@ -443,10 +573,25 @@ export function ExpansionTimeline() {
                 <StatusBadge status={row.status} short />
               </div>
             </header>
-            <section className="timeline-plan-section">
+            <section className={`timeline-plan-section ${planSections.has('milestones') ? 'is-collapsed' : ''}`}>
               <header className="timeline-plan-section-head">
-                <strong>全部阀点明细</strong>
-                <small className="muted">8 个标准阶段 · 卡片包含阀点序号/名称/状态/计划&实际日期/双方行动</small>
+                <button
+                  type="button"
+                  className="section-toggle"
+                  onClick={() => toggleSection(row.id, 'milestones')}
+                  aria-expanded={!planSections.has('milestones')}
+                  aria-label={planSections.has('milestones') ? '展开阀点明细' : '收起阀点明细'}
+                  title={planSections.has('milestones') ? '展开' : '收起'}
+                >
+                  <ChevronDown size={12} className={planSections.has('milestones') ? 'is-collapsed' : ''} />
+                </button>
+                <div className="section-head-title">
+                  <div className="section-head-line">
+                    <strong>全部阀点明细</strong>
+                    <SectionSummary summary={summarizeMilestones(row)} />
+                  </div>
+                  <small className="muted">8 个标准阶段 · 卡片包含阀点序号/名称/状态/计划&实际日期/双方行动</small>
+                </div>
               </header>
               <div className="milestone-grid">
                 {MILESTONE_TEMPLATE.map((tmpl, idx) => {
@@ -479,7 +624,26 @@ export function ExpansionTimeline() {
                 })}
               </div>
             </section>
-            <section className="timeline-plan-section">
+            <section className={`timeline-plan-section ${planSections.has('approvals') ? 'is-collapsed' : ''}`}>
+              <header className="timeline-plan-section-head">
+                <button
+                  type="button"
+                  className="section-toggle"
+                  onClick={() => toggleSection(row.id, 'approvals')}
+                  aria-expanded={!planSections.has('approvals')}
+                  aria-label={planSections.has('approvals') ? '展开审批事项' : '收起审批事项'}
+                  title={planSections.has('approvals') ? '展开' : '收起'}
+                >
+                  <ChevronDown size={12} className={planSections.has('approvals') ? 'is-collapsed' : ''} />
+                </button>
+                <div className="section-head-title">
+                  <div className="section-head-line">
+                    <strong>关键审批事项进度</strong>
+                    <SectionSummary summary={summarizeApprovals(row)} />
+                  </div>
+                  <small className="muted">6 项前置审批 · 状态自动按日期推算 · 鼠标悬浮审批事项查看准备周期</small>
+                </div>
+              </header>
               <ApprovalSection
                 approvals={row.approvals}
                 onEdit={setEditingApproval}
@@ -496,7 +660,26 @@ export function ExpansionTimeline() {
                   : undefined}
               />
             </section>
-            <section className="timeline-plan-section">
+            <section className={`timeline-plan-section ${planSections.has('commissionings') ? 'is-collapsed' : ''}`}>
+              <header className="timeline-plan-section-head">
+                <button
+                  type="button"
+                  className="section-toggle"
+                  onClick={() => toggleSection(row.id, 'commissionings')}
+                  aria-expanded={!planSections.has('commissionings')}
+                  aria-label={planSections.has('commissionings') ? '展开试车验证' : '收起试车验证'}
+                  title={planSections.has('commissionings') ? '展开' : '收起'}
+                >
+                  <ChevronDown size={12} className={planSections.has('commissionings') ? 'is-collapsed' : ''} />
+                </button>
+                <div className="section-head-title">
+                  <div className="section-head-line">
+                    <strong>试车验证记录</strong>
+                    <SectionSummary summary={summarizeCommissionings(row)} />
+                  </div>
+                  <small className="muted">6 项验证项目 · 含目标值/实测值/合格判定/验证日期/备注</small>
+                </div>
+              </header>
               <CommissioningSection
                 commissionings={row.commissionings}
                 onEdit={setEditingCommissioning}
@@ -513,7 +696,26 @@ export function ExpansionTimeline() {
                   : undefined}
               />
             </section>
-            <section className="timeline-plan-section">
+            <section className={`timeline-plan-section ${planSections.has('ramps') ? 'is-collapsed' : ''}`}>
+              <header className="timeline-plan-section-head">
+                <button
+                  type="button"
+                  className="section-toggle"
+                  onClick={() => toggleSection(row.id, 'ramps')}
+                  aria-expanded={!planSections.has('ramps')}
+                  aria-label={planSections.has('ramps') ? '展开爬坡跟踪' : '收起爬坡跟踪'}
+                  title={planSections.has('ramps') ? '展开' : '收起'}
+                >
+                  <ChevronDown size={12} className={planSections.has('ramps') ? 'is-collapsed' : ''} />
+                </button>
+                <div className="section-head-title">
+                  <div className="section-head-line">
+                    <strong>阶段爬坡跟踪</strong>
+                    <SectionSummary summary={summarizeRamps(row)} />
+                  </div>
+                  <small className="muted">4 阶段爬坡 · 含负荷率/目标产能/计划周期/实际产能/确认日期</small>
+                </div>
+              </header>
               <RampSection
                 ramps={row.ramps}
                 onEdit={setEditingRamp}
@@ -531,7 +733,8 @@ export function ExpansionTimeline() {
               />
             </section>
           </div>
-        ))}
+          )
+        })}
       </section>
 
       {editingPlan && (
@@ -765,10 +968,6 @@ function ApprovalSection({ approvals, onEdit, onUploadEvidence, onPreviewEvidenc
   if (!approvals.length) return null
   return (
     <section className="approval-progress">
-      <header className="timeline-plan-section-head">
-        <strong>关键审批事项进度</strong>
-        <small className="muted">6 项前置审批 · 状态自动按日期推算 · 鼠标悬浮审批事项查看准备周期</small>
-      </header>
       <table className="table">
         <thead>
           <tr>
@@ -849,10 +1048,6 @@ function CommissioningSection({ commissionings, onEdit, onUploadEvidence, onPrev
   if (!commissionings.length) return null
   return (
     <section className="commissioning-progress">
-      <header className="timeline-plan-section-head">
-        <strong>试车验证记录</strong>
-        <small className="muted">6 项验证项目 · 含目标值/实测值/合格判定/验证日期/备注</small>
-      </header>
       <table className="table">
         <thead>
           <tr>
@@ -938,10 +1133,6 @@ function RampSection({ ramps, onEdit, onUploadEvidence, onPreviewEvidence, onUpg
   if (!ramps.length) return null
   return (
     <section className="ramp-progress">
-      <header className="timeline-plan-section-head">
-        <strong>量产爬坡计划跟踪</strong>
-        <small className="muted">4 阶段爬坡 · 负荷率 40→100% · 含目标/实际产能与达标判定</small>
-      </header>
       <table className="table">
         <thead>
           <tr>
