@@ -8,7 +8,7 @@ export const RISK_TYPE_LABELS: Record<RiskTypeKey, string> = {
   POLICY: '政策风险',
   QUALITY: '质量风险',
   APPROVAL_OVERDUE: '审批逾期',
-  COMMISSIONING_FAIL: '试车不达标',
+  COMMISSIONING_FAIL: '试产不达标',
   RAMP_BELOW_TARGET: '爬坡未达标',
   MILESTONE_DELAYED: '阀点延期',
 }

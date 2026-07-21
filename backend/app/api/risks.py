@@ -29,7 +29,7 @@ TYPE_LABELS = {
     "QUALITY": "质量风险",
     # === L2 节点级风险（新增） ===
     "APPROVAL_OVERDUE": "审批逾期",
-    "COMMISSIONING_FAIL": "试车不达标",
+    "COMMISSIONING_FAIL": "试产不达标",
     "RAMP_BELOW_TARGET": "爬坡未达标",
     "MILESTONE_DELAYED": "阀点延期",
 }
@@ -64,7 +64,7 @@ def _resolve_source(db: Session, source_kind: str | None, source_id: int | None,
     elif source_kind == "commissioning":
         c = db.get(CommissioningItem, source_id)
         if c:
-            label = f"试车 {c.type}"
+            label = f"试产 {c.type}"
             extra = {
                 "status": c.pass_status,
                 "verifiedAt": c.verified_at.isoformat() if c.verified_at else None,

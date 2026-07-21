@@ -266,7 +266,7 @@ export function PlanCreateModal({ onClose, onCreated }: Props) {
                 onChange={(e) => setGenCommissionings(e.target.checked)}
               />
               <span>
-                <strong>{COMMISSIONING_TYPES.length} 项试车验证</strong> · 排布在收尾段 ·
+                <strong>{COMMISSIONING_TYPES.length} 项试产验证</strong> · 排布在收尾段 ·
                 <code>target_value</code> 预填模板验证标准
               </span>
             </label>

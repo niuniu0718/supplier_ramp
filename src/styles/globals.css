@@ -838,7 +838,13 @@ a { color: inherit; }
 }
 .section-summary-chip.tone-green { background: #e6f8f1; color: var(--green); }
 .section-summary-chip.tone-orange { background: #fff0e3; color: var(--orange); }
-.section-summary-chip.tone-red { background: #ffe4e0; color: var(--red); }
+.section-summary-chip.tone-red {
+  background: #ffe4e0;
+  color: var(--red);
+  font-weight: 600;
+  border: 1px solid #f5b5af;
+  padding: 3px 8px;
+}
 .section-summary-chip.tone-gray { background: #eef2f7; color: var(--text-muted); }
 /* 默认隐藏；只在折叠时出现 */
 .timeline-plan-section:not(.is-collapsed) .section-summary { display: none; }
@@ -1016,6 +1022,57 @@ a { color: inherit; }
 }
 .milestone-card-dates small { display: block; font-size: 10px; margin-bottom: 1px; }
 .milestone-card-dates span { font-size: 12px; font-weight: 600; }
+
+/* 悬浮说明框：阀点的计划/实际/佐证 hover 展示该阀点的关键交付物 */
+.hover-note {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+}
+.hover-note .milestone-date-value { border-bottom: 1px dashed var(--border); padding-bottom: 1px; }
+.hover-note .milestone-evidence-wrap { display: inline-flex; }
+.hover-note-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+  padding: 8px 12px;
+  min-width: 220px;
+  max-width: 320px;
+  z-index: 50;
+  text-align: left;
+  white-space: normal;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.hover-note-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--surface);
+  filter: drop-shadow(0 1px 0 var(--border));
+}
+.hover-note-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  letter-spacing: 0.02em;
+}
+.hover-note-body {
+  display: block;
+  white-space: pre-line;
+}
 .milestone-card-sides {
   display: flex;
   flex-direction: column;

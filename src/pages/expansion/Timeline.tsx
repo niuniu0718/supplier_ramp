@@ -114,6 +114,30 @@ function saveCollapsedSections(map: Record<string, Set<SectionKey>>) {
   } catch { /* noop */ }
 }
 
+// 悬浮说明框：包裹任意子元素，悬停时在下方展开一个轻量说明卡。
+// 文本支持多行（\n 转为换行），用于阀点的关键交付物说明。
+function HoverNote({ text, children }: { text: string; children: React.ReactElement }) {
+  const [open, setOpen] = useState(false)
+  if (!text) return children
+  return (
+    <span
+      className={`hover-note ${open ? 'is-open' : ''}`}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+    >
+      {children}
+      {open && (
+        <span className="hover-note-bubble" role="tooltip">
+          <span className="hover-note-title">关键交付物</span>
+          <span className="hover-note-body">{text}</span>
+        </span>
+      )}
+    </span>
+  )
+}
+
 // L2 完成态摘要：折叠时在标题旁简短提示该 plan 的整体进度
 // 仅返回非零项，按"已逾期 → 进行中 → 已完成"反向优先级排序以便一眼看到风险
 type SummaryChip = { label: string; tone: 'green' | 'orange' | 'red' | 'gray' }
@@ -128,11 +152,12 @@ function summarizeMilestones(row: ExpansionTimelineRow): { total: number; chips:
     else pending++
   }
   const chips: SummaryChip[] = []
-  if (overdue) chips.push({ label: `${overdue} 已逾期`, tone: 'red' })
+  // 逾期优先前置，红框粗体作为首要警示
+  if (overdue) chips.push({ label: `⚠ 已逾期 ${overdue} 项`, tone: 'red' })
+  if (done && done === items.length) chips.push({ label: `已全部完成`, tone: 'green' })
+  else if (done) chips.push({ label: `${done}/${items.length} 已完成`, tone: 'green' })
   if (progress) chips.push({ label: `${progress} 进行中`, tone: 'orange' })
   if (pending) chips.push({ label: `${pending} 未开始`, tone: 'gray' })
-  if (done && done === items.length) chips.unshift({ label: `已全部完成`, tone: 'green' })
-  else if (done) chips.unshift({ label: `${done}/${items.length} 已完成`, tone: 'green' })
   return { total: items.length, chips }
 }
 
@@ -146,11 +171,11 @@ function summarizeApprovals(row: ExpansionTimelineRow): { total: number; chips: 
     else pending++
   }
   const chips: SummaryChip[] = []
-  if (overdue) chips.push({ label: `${overdue} 已逾期`, tone: 'red' })
+  if (overdue) chips.push({ label: `⚠ 已逾期 ${overdue} 项`, tone: 'red' })
+  if (done && done === list.length) chips.push({ label: `已全部批复`, tone: 'green' })
+  else if (done) chips.push({ label: `${done}/${list.length} 已批复`, tone: 'green' })
   if (progress) chips.push({ label: `${progress} 进行中`, tone: 'orange' })
   if (pending) chips.push({ label: `${pending} 未开始`, tone: 'gray' })
-  if (done && done === list.length) chips.unshift({ label: `已全部批复`, tone: 'green' })
-  else if (done) chips.unshift({ label: `${done}/${list.length} 已批复`, tone: 'green' })
   return { total: list.length, chips }
 }
 
@@ -164,11 +189,11 @@ function summarizeCommissionings(row: ExpansionTimelineRow): { total: number; ch
     else pending++
   }
   const chips: SummaryChip[] = []
-  if (fail) chips.push({ label: `${fail} 未通过`, tone: 'red' })
+  if (fail) chips.push({ label: `⚠ ${fail} 项未通过`, tone: 'red' })
+  if (pass && pass === list.length) chips.push({ label: `已全部通过`, tone: 'green' })
+  else if (pass) chips.push({ label: `${pass}/${list.length} 已通过`, tone: 'green' })
   if (progress) chips.push({ label: `${progress} 验证中`, tone: 'orange' })
   if (pending) chips.push({ label: `${pending} 待评估`, tone: 'gray' })
-  if (pass && pass === list.length) chips.unshift({ label: `已全部通过`, tone: 'green' })
-  else if (pass) chips.unshift({ label: `${pass}/${list.length} 已通过`, tone: 'green' })
   return { total: list.length, chips }
 }
 
@@ -182,11 +207,11 @@ function summarizeRamps(row: ExpansionTimelineRow): { total: number; chips: Summ
     else pending++
   }
   const chips: SummaryChip[] = []
-  if (fail) chips.push({ label: `${fail} 未达标`, tone: 'red' })
+  if (fail) chips.push({ label: `⚠ ${fail} 项未达标`, tone: 'red' })
+  if (pass && pass === list.length) chips.push({ label: `已全部达标`, tone: 'green' })
+  else if (pass) chips.push({ label: `${pass}/${list.length} 已确认`, tone: 'green' })
   if (progress) chips.push({ label: `${progress} 进行中`, tone: 'orange' })
   if (pending) chips.push({ label: `${pending} 待确认`, tone: 'gray' })
-  if (pass && pass === list.length) chips.unshift({ label: `已全部达标`, tone: 'green' })
-  else if (pass) chips.unshift({ label: `${pass}/${list.length} 已确认`, tone: 'green' })
   return { total: list.length, chips }
 }
 
@@ -604,6 +629,7 @@ export function ExpansionTimeline() {
                       order={idx + 1}
                       templateName={tmpl.name}
                       TemplateIcon={tmpl.icon}
+                      deliverables={tmpl.deliverables}
                       item={item}
                       itemLabel={itemLabel}
                       onEdit={item ? () => setEditingItem(item) : undefined}
@@ -667,14 +693,14 @@ export function ExpansionTimeline() {
                   className="section-toggle"
                   onClick={() => toggleSection(row.id, 'commissionings')}
                   aria-expanded={!planSections.has('commissionings')}
-                  aria-label={planSections.has('commissionings') ? '展开试车验证' : '收起试车验证'}
+                  aria-label={planSections.has('commissionings') ? '展开试产验证' : '收起试产验证'}
                   title={planSections.has('commissionings') ? '展开' : '收起'}
                 >
                   <ChevronDown size={12} className={planSections.has('commissionings') ? 'is-collapsed' : ''} />
                 </button>
                 <div className="section-head-title">
                   <div className="section-head-line">
-                    <strong>试车验证记录</strong>
+                    <strong>试产验证记录</strong>
                     <SectionSummary summary={summarizeCommissionings(row)} />
                   </div>
                   <small className="muted">6 项验证项目 · 含目标值/实测值/合格判定/验证日期/备注</small>
@@ -823,7 +849,7 @@ export function ExpansionTimeline() {
           {deleteError && <p className="form-error">{deleteError}</p>}
           <p>确定要删除扩产计划「{deletingPlan.name}」吗？</p>
           <ul className="plan-delete-list muted">
-            <li>该计划下的 8 个里程碑阀点、6 项审批、6 项试车验证、4 阶段爬坡记录将一并删除</li>
+            <li>该计划下的 8 个里程碑阀点、6 项审批、6 项试产验证、4 阶段爬坡记录将一并删除</li>
             <li>所有已上传的佐证文件也会被清理</li>
             <li>此操作不可恢复，请谨慎</li>
           </ul>
@@ -867,6 +893,7 @@ interface MilestoneCardProps {
   order: number
   templateName: string
   TemplateIcon: LucideIcon
+  deliverables?: string
   item?: ExpansionMilestoneItem
   itemLabel?: string
   onEdit?: () => void
@@ -876,13 +903,14 @@ interface MilestoneCardProps {
   upgradedRisk?: UpgradedRiskRef | null
 }
 
-function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUploadEvidence, onUpgrade, onPreviewEvidence, upgradedRisk }: MilestoneCardProps) {
+function MilestoneCard({ order, templateName, TemplateIcon, deliverables, item, onEdit, onUploadEvidence, onUpgrade, onPreviewEvidence, upgradedRisk }: MilestoneCardProps) {
   const meta = item ? milestoneStatusMeta(item.status) : milestoneStatusMeta('未开始')
   const Icon = TemplateIcon
   const overdue = item?.overdue ?? false
   const tone = overdue ? 'overdue' : meta.tone
   const pillMeta = PILL_META[tone]
   const upgraded = !!upgradedRisk
+  const noteText = deliverables ?? ''
   return (
     <div className={`milestone-card ${overdue ? 'is-overdue' : ''} tone-${tone}`}>
       <header className="milestone-card-head">
@@ -901,17 +929,41 @@ function MilestoneCard({ order, templateName, TemplateIcon, item, onEdit, onUplo
       <div className="milestone-card-dates">
         <div>
           <small className="muted">计划完成</small>
-          <span>{item ? fmtDate(item.expectedArrival) : '—'}</span>
+          {noteText ? (
+            <HoverNote text={noteText}>
+              <span className="milestone-date-value">{item ? fmtDate(item.expectedArrival) : '—'}</span>
+            </HoverNote>
+          ) : (
+            <span>{item ? fmtDate(item.expectedArrival) : '—'}</span>
+          )}
         </div>
         <div>
           <small className="muted">实际完成</small>
-          <span className={item?.actualArrival ? '' : 'muted'}>
-            {item?.actualArrival ? fmtDate(item.actualArrival) : '—'}
-          </span>
+          {noteText ? (
+            <HoverNote text={noteText}>
+              <span className={`milestone-date-value ${item?.actualArrival ? '' : 'muted'}`}>
+                {item?.actualArrival ? fmtDate(item.actualArrival) : '—'}
+              </span>
+            </HoverNote>
+          ) : (
+            <span className={item?.actualArrival ? '' : 'muted'}>
+              {item?.actualArrival ? fmtDate(item.actualArrival) : '—'}
+            </span>
+          )}
         </div>
         <div className="milestone-card-evidence">
           <small className="muted">佐证</small>
-          {item ? (
+          {noteText ? (
+            <HoverNote text={noteText}>
+              <span className="milestone-evidence-wrap">
+                {item ? (
+                  <EvidenceChipList evidence={item.evidence} onPreview={onPreviewEvidence ?? (() => {})} emptyText="—" />
+                ) : (
+                  <span className="muted">—</span>
+                )}
+              </span>
+            </HoverNote>
+          ) : item ? (
             <EvidenceChipList evidence={item.evidence} onPreview={onPreviewEvidence ?? (() => {})} emptyText="—" />
           ) : (
             <span className="muted">—</span>
@@ -1066,7 +1118,7 @@ function CommissioningSection({ commissionings, onEdit, onUploadEvidence, onPrev
           {COMMISSIONING_TYPES.map((tmpl) => {
             const row = commissionings.find((c) => c.type === tmpl.key)
             const meta = row ? commissioningStatusMeta(row.passStatus) : commissioningStatusMeta('PENDING')
-            const label = `试车 ${tmpl.order} · ${tmpl.name}`
+            const label = `试产 ${tmpl.order} · ${tmpl.name}`
             const upgraded = !!row?.upgradedRisk
             return (
               <tr key={tmpl.key} className={row?.passStatus === 'FAIL' ? 'is-fail' : ''}>

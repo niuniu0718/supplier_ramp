@@ -232,7 +232,7 @@ export function PlanEditModal({ plan, onClose, onSaved }: Props) {
           <strong>子节点计划时间</strong>
           <small className="muted">
             调整 4 个 L2 模块的计划日期 · {sortedItems.length} 阀点 ·
-            {' '}{plan.approvals.length} 审批 · {plan.commissionings.length} 试车 ·
+            {' '}{plan.approvals.length} 审批 · {plan.commissionings.length} 试产 ·
             {' '}{plan.ramps.length} 爬坡
           </small>
         </header>
@@ -340,7 +340,7 @@ export function PlanEditModal({ plan, onClose, onSaved }: Props) {
         {/* 试车 */}
         <details className="plan-edit-children-group">
           <summary>
-            <strong>试车验证 · 验证日期</strong>
+            <strong>试产验证 · 验证日期</strong>
             <small className="muted">6 项验证项目</small>
           </summary>
           <table className="table plan-edit-table">

@@ -25,7 +25,7 @@ const KIND_LABELS: Record<EvidenceTarget['kind'], string> = {
   plan: '整计划',
   item: '阀点',
   approval: '审批',
-  commissioning: '试车',
+  commissioning: '试产',
   ramp: '爬坡',
 }
 
@@ -53,12 +53,12 @@ export function ExpansionEvidence() {
       boardId="expansion"
       boardLabel="扩产跟踪"
       title="证据档案"
-      description="按目标节点归档：整计划 / 8 个阀点 / 6 项审批 / 6 项试车 / 4 个爬坡阶段"
+      description="按目标节点归档：整计划 / 8 个阀点 / 6 项审批 / 6 项试产 / 4 个爬坡阶段"
       views={VIEWS}
       kpis={data.kpis.map((k, i) => <KpiCard key={i} kpi={k} />)}
     >
       {data.planGroups.length === 0 ? (
-        <p className="muted">暂无证据。在里程碑时间轴页面选定任意阀点/审批/试车/爬坡或计划，点击 [+佐证] 即可添加。</p>
+        <p className="muted">暂无证据。在里程碑时间轴页面选定任意阀点/审批/试产/爬坡或计划，点击 [+佐证] 即可添加。</p>
       ) : data.planGroups.map((g) => (
         <article key={g.planId} className="panel evidence-panel">
           <div className="panel-title">

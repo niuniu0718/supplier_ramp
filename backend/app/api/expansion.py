@@ -486,7 +486,7 @@ def expansion_evidence(
                 node_key = f"commissioning:{target_id}"
                 c = commissionings_by_id[target_id]
                 tmpl = COMMISSIONING_BY_KEY.get(c.type, {})
-                label = f"试车 · {tmpl.get('name', c.type)}"
+                label = f"试产 · {tmpl.get('name', c.type)}"
             elif key == "ramp" and target_id in ramps_by_id:
                 node_key = f"ramp:{target_id}"
                 r = ramps_by_id[target_id]
@@ -617,7 +617,7 @@ def update_commissioning(
 ):
     c = db.get(CommissioningItem, commissioning_id)
     if not c:
-        raise HTTPException(status_code=404, detail="试车验证项不存在。")
+        raise HTTPException(status_code=404, detail="试产验证项不存在。")
     _apply_partial(c, {
         "target_value", "actual_value", "pass_status", "note",
     }, body, datetime_fields={"verified_at"})
@@ -837,7 +837,7 @@ def _build_ramp_confirmed_dates(start: datetime, end: datetime) -> List[datetime
 
 
 def _build_commissioning_dates(start: datetime, end: datetime) -> List[datetime]:
-    """6 项试车验证按里程碑节奏，前 5 项在最后 1/3 时段起点之后。"""
+    """6 项试产验证按里程碑节奏，前 5 项在最后 1/3 时段起点之后。"""
     if end <= start:
         return [start] * len(COMMISSIONING_TYPES)
     span = (end - start).total_seconds()
