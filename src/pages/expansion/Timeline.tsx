@@ -146,8 +146,10 @@ function summarizeMilestones(row: ExpansionTimelineRow): { total: number; chips:
   const items = row.items
   let done = 0, overdue = 0, progress = 0, pending = 0
   for (const it of items) {
-    if (it.actualArrival || it.status === '已完成') done++
-    else if (it.overdue || it.status === '已逾期') overdue++
+    // 优先级：已逾期 > 已完成 > 进行中 > 未开始
+    // 后端会标 status='已逾期' 即便 actualArrival 已存在（"已逾期补录"的场景），必须优先计入逾期
+    if (it.overdue || it.status === '已逾期') overdue++
+    else if (it.actualArrival || it.status === '已完成') done++
     else if (it.status === '进行中') progress++
     else pending++
   }
