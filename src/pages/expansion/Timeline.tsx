@@ -929,27 +929,13 @@ function MilestoneCard({ order, templateName, TemplateIcon, deliverables, item, 
       <div className="milestone-card-dates">
         <div>
           <small className="muted">计划完成</small>
-          {noteText ? (
-            <HoverNote text={noteText}>
-              <span className="milestone-date-value">{item ? fmtDate(item.expectedArrival) : '—'}</span>
-            </HoverNote>
-          ) : (
-            <span>{item ? fmtDate(item.expectedArrival) : '—'}</span>
-          )}
+          <span>{item ? fmtDate(item.expectedArrival) : '—'}</span>
         </div>
         <div>
           <small className="muted">实际完成</small>
-          {noteText ? (
-            <HoverNote text={noteText}>
-              <span className={`milestone-date-value ${item?.actualArrival ? '' : 'muted'}`}>
-                {item?.actualArrival ? fmtDate(item.actualArrival) : '—'}
-              </span>
-            </HoverNote>
-          ) : (
-            <span className={item?.actualArrival ? '' : 'muted'}>
-              {item?.actualArrival ? fmtDate(item.actualArrival) : '—'}
-            </span>
-          )}
+          <span className={item?.actualArrival ? '' : 'muted'}>
+            {item?.actualArrival ? fmtDate(item.actualArrival) : '—'}
+          </span>
         </div>
         <div className="milestone-card-evidence">
           <small className="muted">佐证</small>
